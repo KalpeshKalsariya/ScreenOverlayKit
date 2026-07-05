@@ -6,15 +6,14 @@ A lightweight debug tool for iOS developers to instantly see which screen they'r
 
 </div>
 
-</div>
-<div align="center">
-Demo
-
-(https://github.com/user-attachments/assets/34d83c10-619f-4987-9721-42f0907ebf63)
-
-</div>
-
 ---
+
+<div align="center">
+
+https://github.com/user-attachments/assets/94611da2-581f-4ceb-96f1-ed5e4431c991
+
+</div>
+
 
 The overlay label updates automatically as the user moves from screen to screen — no manual calls needed. Tapping the label shows the full view-controller hierarchy path for the current screen (nav stack → tab → modal chain), with a one-tap copy button, and the label itself can be dragged to any edge of the screen.
 
@@ -195,7 +194,7 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 ## Contact
 
-For questions or feature requests, open an issue on GitHub.
+For questions or feature requests, reach out at kalsariyakalpesh993@gmail.com open an issue on GitHub.
 
 ## Author
 
