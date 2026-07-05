@@ -10,7 +10,7 @@ A lightweight debug tool for iOS developers to instantly see which screen they'r
 <div align="center">
 Demo
 
-[(add a screen recording or GIF here showing the pill updating as you navigate, and the tap-to-view-path alert)](https://github.com/user-attachments/assets/34d83c10-619f-4987-9721-42f0907ebf63)
+(https://github.com/user-attachments/assets/34d83c10-619f-4987-9721-42f0907ebf63)
 
 </div>
 
