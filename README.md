@@ -194,7 +194,7 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 ## Contact
 
-For questions or feature requests, reach out at kalsariyakalpesh993@gmail.com open an issue on GitHub.
+For questions or feature requests, reach out at kalsariyakalpesh993@gmail.com or open an issue on GitHub.
 
 ## Author
 
