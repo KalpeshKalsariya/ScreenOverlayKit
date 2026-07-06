@@ -42,7 +42,7 @@ ScreenOverlayKit also ships `ScreenCaptureGuard`, a separate, production-safe fe
 - 📱 **Real-time screen name overlay** — floating pill label shows the active screen's name
 - 🔄 **Auto-detection (UIKit)** — uses method swizzling on `viewDidAppear` / `viewDidDisappear`, no manual calls needed
 - 🧩 **SwiftUI support** — a `.screenOverlayTrack("ScreenName")` view modifier tracks screens that live entirely inside SwiftUI navigation
-- 👆 **Tap to print the hierarchy** — tap the label to print the complete hierarchy (nav stack, tab bar, modal chain) to the console
+- 🌳 **Full hierarchy on every screen change** — the complete hierarchy (nav stack, tab bar, modal chain) prints to the console automatically on every navigation; tap the label to print it on demand too
 - 🧵 **Session history with full paths** — every screen visited during the current (and previous) session is recorded as a full breadcrumb path, queryable any time — no UI needed
 - 📊 **Analytics hook** — implement `ScreenOverlayEventLogger` to forward every screen view (and any custom event you log) to Firebase Analytics or any other backend
 - 🫥 **Passthrough touches** — the overlay never blocks your app's own interactions; only the pill itself is interactive
@@ -405,7 +405,7 @@ ScreenOverlay.enable(draggable: true)
 
 ## Tap to Print the Full Hierarchy
 
-Tap the overlay label to print the complete hierarchy for whatever's currently visible — navigation stack, tab selection, and modal presentation chain — to the Xcode console.
+The full hierarchy — navigation stack, tab selection, and modal presentation chain — is printed to the Xcode console automatically on every screen change (see [Console Output](#console-output) below). Tapping the overlay label prints the exact same block on demand, without waiting for a navigation to trigger it — handy when you just want to check the current hierarchy without moving anywhere.
 
 For a simple app — just a `UINavigationController` with one screen — it looks like this:
 
@@ -524,22 +524,10 @@ Every line ScreenOverlayKit can print, grouped by when it happens — this is th
 🛑 ScreenOverlayKit disabled
 ```
 
-**On every screen change (automatic — no setup beyond `enable()`):**
+**On every screen change (automatic — no setup beyond `enable()`):** the screen name, followed immediately by the full hierarchy — the same block you get from tapping the overlay label, printed automatically every time so you never have to tap just to see context:
 
 ```
-📱 ScreenOverlay → HomeViewController
-📱 ScreenOverlay → ProfileViewController
-```
-
-**With `trackScreenDuration: true`, printed the moment the user navigates away from a screen:**
-
-```
-⏱️ ScreenOverlay → HomeViewController stayed 4s
-```
-
-**After tapping the overlay label** — see [Tap to Print the Full Hierarchy](#tap-to-print-the-full-hierarchy) above for the full breakdown:
-
-```
+📱 ScreenOverlay → ViewController
 ==========================
 📡 ScreenOverlayKit Hierarchy
 ==========================
@@ -551,6 +539,14 @@ Every line ScreenOverlayKit can print, grouped by when it happens — this is th
    ↳ ViewController
 
 ==========================
+```
+
+See [Tap to Print the Full Hierarchy](#tap-to-print-the-full-hierarchy) above for what this looks like with a tab bar, nested navigation, and a presented modal.
+
+**With `trackScreenDuration: true`, printed the moment the user navigates away from a screen:**
+
+```
+⏱️ ScreenOverlay → HomeViewController stayed 4s
 ```
 
 **From `ScreenOverlay.logEvent(name:parameters:)`:**

@@ -27,7 +27,9 @@ final class ViewControllerTracker {
 
     // MARK: - Public Methods
 
-    /// Refreshes the overlay label with the current top view controller name.
+    /// Refreshes the overlay label with the current top view controller name, and prints the
+    /// full hierarchy — the same thing tapping the overlay label does — so every screen change
+    /// shows its complete context in the console without waiting for a tap.
     ///
     /// No-ops if the resolved top screen hasn't changed since the last call — `refresh()` is
     /// called from every view controller's `viewDidAppear` in the hierarchy, and several of
@@ -40,6 +42,7 @@ final class ViewControllerTracker {
 
         lastReportedScreenName = screenName
         print("📱 ScreenOverlay → \(screenName)")
+        printHierarchy()
         OverlayManager.shared.update(text: screenName)
     }
 
@@ -90,7 +93,8 @@ final class ViewControllerTracker {
     }
 
     /// Records that a manually-tracked SwiftUI screen appeared, updating the overlay label and
-    /// console log in addition to the session — used by the `.screenOverlayTrack(_:)` view modifier.
+    /// console log (including the full hierarchy, same as `refresh()`) in addition to the
+    /// session — used by the `.screenOverlayTrack(_:)` view modifier.
     ///
     /// - Parameters:
     ///   - screenName: The screen's display name.
@@ -99,6 +103,7 @@ final class ViewControllerTracker {
     func recordManualAppear(screenName: String, token: AnyObject) {
         guard SessionRecorder.shared.recordManualAppear(screenName: screenName, token: token) else { return }
         print("📱 ScreenOverlay → \(screenName)")
+        printHierarchy()
         OverlayManager.shared.update(text: screenName)
     }
 
