@@ -23,7 +23,11 @@ final class TrailLogger {
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
-    private var currentViewController: UIViewController?
+    /// The currently tracked screen: its display name plus an identity token used to dedupe
+    /// repeated appearances and pair an appearance with its matching disappearance. The token
+    /// is the `UIViewController` instance itself for automatic tracking, or a per-instance
+    /// token for manually-tracked SwiftUI screens (see `recordManualAppear`).
+    private var currentScreen: (name: String, token: AnyObject)?
     private var didStartSession = false
 
     // MARK: - Public Properties
@@ -73,9 +77,25 @@ final class TrailLogger {
         guard !isScreenOverlayController(viewController) else { return }
         guard ViewControllerTracker.shared.isTopViewController(viewController) else { return }
 
-        if append(viewController) {
+        let screenName = ViewControllerTracker.screenName(for: viewController)
+        if recordAppearance(screenName: screenName, token: viewController) {
             saveCurrentTrail()
         }
+    }
+
+    /// Records that a manually-tracked screen appeared — used by SwiftUI's
+    /// `.screenOverlayTrack(_:)` view modifier for screens with no backing `UIViewController`.
+    ///
+    /// - Parameters:
+    ///   - screenName: The screen's display name.
+    ///   - token: A stable per-screen-instance identity used to dedupe repeated appearances
+    ///     and to pair this appearance with its matching disappearance.
+    /// - Returns: `true` if a new trail entry was recorded.
+    @discardableResult
+    func recordManualAppear(screenName: String, token: AnyObject) -> Bool {
+        guard recordAppearance(screenName: screenName, token: token) else { return false }
+        saveCurrentTrail()
+        return true
     }
 
     /// Seeds the trail with the view controllers already visible when
@@ -87,7 +107,7 @@ final class TrailLogger {
 
         viewControllers
             .filter { !isScreenOverlayController($0) }
-            .forEach { append($0) }
+            .forEach { recordAppearance(screenName: ViewControllerTracker.screenName(for: $0), token: $0) }
 
         saveCurrentTrail()
     }
@@ -97,12 +117,15 @@ final class TrailLogger {
     ///
     /// - Parameter viewController: The view controller that just disappeared.
     func recordDisappear(for viewController: UIViewController) {
-        guard showTimeOnTrail else { return }
-        guard currentViewController === viewController else { return }
-        guard let lastIndex = currentTrail.indices.last else { return }
+        recordDisappearance(token: viewController)
+    }
 
-        currentTrail[lastIndex].duration = Date().timeIntervalSince(currentTrail[lastIndex].timestamp)
-        saveCurrentTrail()
+    /// Records that a manually-tracked screen disappeared — used by SwiftUI's
+    /// `.screenOverlayTrack(_:)` view modifier.
+    ///
+    /// - Parameter token: The identity object passed to the matching `recordManualAppear` call.
+    func recordManualDisappear(token: AnyObject) {
+        recordDisappearance(token: token)
     }
 
     /// Clears the current trail and restarts it from whatever screen is
@@ -110,17 +133,13 @@ final class TrailLogger {
     func clearTrailRestartingFromCurrentScreen() {
         currentTrail.removeAll()
 
-        if currentViewController == nil {
-            currentViewController = ViewControllerTracker.shared.topScreenViewController()
+        if currentScreen == nil, let topViewController = ViewControllerTracker.shared.topScreenViewController() {
+            currentScreen = (ViewControllerTracker.screenName(for: topViewController), topViewController)
         }
 
-        if let currentViewController {
+        if let currentScreen {
             currentTrail.append(
-                TrailEntry(
-                    screenName: String(describing: type(of: currentViewController)),
-                    timestamp: Date(),
-                    duration: nil
-                )
+                TrailEntry(screenName: currentScreen.name, timestamp: Date(), duration: nil)
             )
         }
 
@@ -172,6 +191,37 @@ final class TrailLogger {
     }
 
     // MARK: - Private Helpers
+
+    /// Appends a new trail entry if `token` differs from the currently tracked screen, and
+    /// notifies `ScreenOverlay.eventLogger` of the screen view.
+    ///
+    /// - Parameters:
+    ///   - screenName: The new screen's display name.
+    ///   - token: An identity object representing this screen instance (a `UIViewController`
+    ///     for automatic tracking, or a per-instance token for manually-tracked SwiftUI screens).
+    /// - Returns: `true` if a new entry was appended, `false` if it was a duplicate of the current screen.
+    @discardableResult
+    private func recordAppearance(screenName: String, token: AnyObject) -> Bool {
+        guard currentScreen?.token !== token else { return false }
+
+        let previousScreenName = currentScreen?.name
+        currentScreen = (name: screenName, token: token)
+        currentTrail.append(TrailEntry(screenName: screenName, timestamp: Date(), duration: nil))
+        ScreenOverlay.notifyScreenView(screenName, previousScreenName: previousScreenName)
+        return true
+    }
+
+    /// Stamps the duration of the currently tracked screen if `token` matches it.
+    ///
+    /// - Parameter token: The identity object of the screen that disappeared.
+    private func recordDisappearance(token: AnyObject) {
+        guard showTimeOnTrail else { return }
+        guard currentScreen?.token === token else { return }
+        guard let lastIndex = currentTrail.indices.last else { return }
+
+        currentTrail[lastIndex].duration = Date().timeIntervalSince(currentTrail[lastIndex].timestamp)
+        saveCurrentTrail()
+    }
 
     /// Builds the human-readable text export for an arbitrary trail/session.
     ///
@@ -281,26 +331,6 @@ final class TrailLogger {
     /// Persists `currentTrail` to `UserDefaults`.
     private func saveCurrentTrail() {
         save(currentTrail, forKey: currentTrailKey)
-    }
-
-    /// Appends a view controller to the current trail if it differs from the
-    /// last recorded view controller.
-    ///
-    /// - Parameter viewController: The view controller to record.
-    /// - Returns: `true` if a new entry was appended, `false` if it was a duplicate.
-    @discardableResult
-    private func append(_ viewController: UIViewController) -> Bool {
-        guard currentViewController !== viewController else { return false }
-
-        currentViewController = viewController
-        currentTrail.append(
-            TrailEntry(
-                screenName: String(describing: type(of: viewController)),
-                timestamp: Date(),
-                duration: nil
-            )
-        )
-        return true
     }
 
     /// Encodes and stores a trail under the given `UserDefaults` key.

@@ -1,5 +1,5 @@
 //
-//  OverlayWindow.swift
+//  OverlayManager.swift
 //  ScreenOverlayKit
 //
 //  Created by Sanket Khatri on 05/06/26.
@@ -7,21 +7,19 @@
 
 import UIKit
 
-/// Owns the floating `UIWindow` that hosts the ScreenOverlayKit pill label,
-/// and drives its positioning, dragging, and tap behavior.
+/// Owns the floating `PassthroughWindow` that hosts the ScreenOverlayKit pill label
+/// (`OverlayLabel`), and drives its positioning, dragging, and tap behavior.
 @MainActor
-final class OverlayWindow {
+final class OverlayManager {
 
     // MARK: - Singleton
 
-    static let shared = OverlayWindow()
+    static let shared = OverlayManager()
 
     // MARK: - Private Properties
 
     private var window: PassthroughWindow?
-    private let label = PaddingLabel(
-        contentInsets: UIEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
-    )
+    private let label = OverlayLabel()
 
     /// Tracks the label's center during a pan so we can offset correctly.
     private var dragStartCenter: CGPoint = .zero
@@ -103,29 +101,11 @@ final class OverlayWindow {
 
     // MARK: - Setup
 
-    /// Configures the pill label's appearance and gesture recognizers.
+    /// Sets the label's initial text and attaches its gesture recognizers.
     ///
     /// - Parameter draggable: When `true`, adds a pan gesture recognizer for dragging.
     private func configureLabel(draggable: Bool) {
-        // Frame-based — Auto Layout removed to support free dragging
-        label.translatesAutoresizingMaskIntoConstraints = true
         label.text = "ScreenOverlay"
-        label.textAlignment = .center
-        label.numberOfLines = 2
-        label.lineBreakMode = .byTruncatingTail
-        label.textColor = UIColor { trait in
-            trait.userInterfaceStyle == .light ? .white : .black
-        }
-        label.backgroundColor = UIColor { trait in
-            trait.userInterfaceStyle == .light
-                ? UIColor.black.withAlphaComponent(0.55)
-                : UIColor.white.withAlphaComponent(0.75)
-        }
-        label.font = .systemFont(ofSize: 13, weight: .semibold)
-        label.layer.cornerRadius = 6
-        label.clipsToBounds = true
-        label.isUserInteractionEnabled = true
-        label.frame.size = CGSize(width: 140, height: 30)
 
         // Tap → print hierarchy
         let tap = UITapGestureRecognizer(
@@ -172,26 +152,13 @@ final class OverlayWindow {
         }
     }
 
-    /// Resizes the label to fit its current text, clamped between a minimum
-    /// width and the available screen width.
+    /// Computes the available width in `view` and asks the label to resize itself to fit.
     ///
     /// - Parameter view: The superview used to compute the maximum available width.
     private func resizeLabel(in view: UIView?) {
         let horizontalScreenPadding: CGFloat = 20
-        let minimumWidth: CGFloat = 120
-        let maxWidth = max(
-            minimumWidth,
-            (view?.bounds.width ?? UIScreen.main.bounds.width) - horizontalScreenPadding * 2
-        )
-        let fittingSize = label.sizeThatFits(
-            CGSize(width: maxWidth, height: CGFloat.greatestFiniteMagnitude)
-        )
-        let maxHeight = ceil(label.font.lineHeight * 2) + label.contentInsets.top + label.contentInsets.bottom
-
-        label.frame.size = CGSize(
-            width: min(max(fittingSize.width, minimumWidth), maxWidth),
-            height: min(max(fittingSize.height, 30), maxHeight)
-        )
+        let maxWidth = (view?.bounds.width ?? UIScreen.main.bounds.width) - horizontalScreenPadding * 2
+        label.updateSize(forMaxWidth: maxWidth)
     }
 
     // MARK: - Gesture Handlers
@@ -230,11 +197,7 @@ final class OverlayWindow {
             // Slightly enlarge while dragging for tactile feedback
             UIView.animate(withDuration: 0.15) {
                 self.label.transform = CGAffineTransform(scaleX: 1.08, y: 1.08)
-                self.label.backgroundColor = UIColor { trait in
-                    trait.userInterfaceStyle == .light
-                        ? UIColor.black.withAlphaComponent(0.88)
-                        : UIColor.white.withAlphaComponent(0.88)
-                }
+                self.label.backgroundColor = OverlayLabel.draggingBackgroundColor
             }
 
         case .changed:
@@ -265,11 +228,7 @@ final class OverlayWindow {
             ) {
                 self.label.center = snappedCenter
                 self.label.transform = .identity
-                self.label.backgroundColor = UIColor { trait in
-                    trait.userInterfaceStyle == .light
-                        ? UIColor.black.withAlphaComponent(0.55)
-                        : UIColor.white.withAlphaComponent(0.75)
-                }
+                self.label.backgroundColor = OverlayLabel.restingBackgroundColor
             }
 
             savePosition(snappedCenter)
@@ -377,65 +336,5 @@ final class OverlayWindow {
               let y = dict["y"] as? CGFloat
         else { return nil }
         return CGPoint(x: x, y: y)
-    }
-}
-
-/// A `UILabel` subclass that draws its text inset by `contentInsets`,
-/// giving the pill label its padded background.
-private final class PaddingLabel: UILabel {
-    let contentInsets: UIEdgeInsets
-
-    /// Creates a padded label.
-    ///
-    /// - Parameter contentInsets: The insets applied around the text when drawing and sizing.
-    init(contentInsets: UIEdgeInsets) {
-        self.contentInsets = contentInsets
-        super.init(frame: .zero)
-    }
-
-    required init?(coder: NSCoder) {
-        self.contentInsets = .zero
-        super.init(coder: coder)
-    }
-
-    /// Draws the text inset by `contentInsets` instead of filling the full bounds.
-    override func drawText(in rect: CGRect) {
-        super.drawText(in: rect.inset(by: contentInsets))
-    }
-
-    /// Computes the text rect within the inset bounds, then expands it back
-    /// out so the label reserves space for the padding.
-    override func textRect(
-        forBounds bounds: CGRect,
-        limitedToNumberOfLines numberOfLines: Int
-    ) -> CGRect {
-        let insetBounds = bounds.inset(by: contentInsets)
-        let textRect = super.textRect(
-            forBounds: insetBounds,
-            limitedToNumberOfLines: numberOfLines
-        )
-
-        return textRect.inset(
-            by: UIEdgeInsets(
-                top: -contentInsets.top,
-                left: -contentInsets.left,
-                bottom: -contentInsets.bottom,
-                right: -contentInsets.right
-            )
-        )
-    }
-
-    /// Computes the size that fits the text plus `contentInsets`.
-    override func sizeThatFits(_ size: CGSize) -> CGSize {
-        let insetSize = CGSize(
-            width: max(0, size.width - contentInsets.left - contentInsets.right),
-            height: max(0, size.height - contentInsets.top - contentInsets.bottom)
-        )
-        let fittingSize = super.sizeThatFits(insetSize)
-
-        return CGSize(
-            width: fittingSize.width + contentInsets.left + contentInsets.right,
-            height: fittingSize.height + contentInsets.top + contentInsets.bottom
-        )
     }
 }

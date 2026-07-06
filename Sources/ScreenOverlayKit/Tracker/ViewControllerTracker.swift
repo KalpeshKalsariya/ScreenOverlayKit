@@ -23,9 +23,9 @@ final class ViewControllerTracker {
     /// Refreshes the overlay label with the current top view controller name.
     func refresh() {
         guard let vc = topViewController() else { return }
-        let screenName = String(describing: type(of: vc))
+        let screenName = Self.screenName(for: vc)
         print("📱 ScreenOverlay → \(screenName)")
-        OverlayWindow.shared.update(text: screenName)
+        OverlayManager.shared.update(text: screenName)
     }
 
     /// Prints the full view controller hierarchy to the console.
@@ -74,6 +74,27 @@ final class ViewControllerTracker {
         TrailLogger.shared.recordDisappear(for: viewController)
     }
 
+    /// Records that a manually-tracked SwiftUI screen appeared, updating the overlay label and
+    /// console log in addition to the trail — used by the `.screenOverlayTrack(_:)` view modifier.
+    ///
+    /// - Parameters:
+    ///   - screenName: The screen's display name.
+    ///   - token: A stable per-screen-instance identity used to dedupe repeated appearances and
+    ///     to pair this appearance with its matching disappearance.
+    func recordManualAppear(screenName: String, token: AnyObject) {
+        guard TrailLogger.shared.recordManualAppear(screenName: screenName, token: token) else { return }
+        print("📱 ScreenOverlay → \(screenName)")
+        OverlayManager.shared.update(text: screenName)
+    }
+
+    /// Records that a manually-tracked SwiftUI screen disappeared — used by the
+    /// `.screenOverlayTrack(_:)` view modifier.
+    ///
+    /// - Parameter token: The identity object passed to the matching `recordManualAppear` call.
+    func recordManualDisappear(token: AnyObject) {
+        TrailLogger.shared.recordManualDisappear(token: token)
+    }
+
     /// Checks whether a given view controller is currently the top-most visible screen.
     ///
     /// - Parameter viewController: The view controller to check.
@@ -95,6 +116,27 @@ final class ViewControllerTracker {
         topViewController()
     }
 
+    /// Resolves a friendly screen name for a view controller.
+    ///
+    /// SwiftUI screens hosted via `UIHostingController<ContentView>` are stripped down to just
+    /// their wrapped view's name (`ContentView`) for readability.
+    ///
+    /// - Parameter viewController: The view controller to name.
+    /// - Returns: The friendly screen name.
+    static func screenName(for viewController: UIViewController) -> String {
+        let rawName = String(describing: type(of: viewController))
+
+        guard rawName.hasPrefix("UIHostingController<"), rawName.hasSuffix(">") else {
+            return rawName
+        }
+
+        let wrappedName = rawName
+            .dropFirst("UIHostingController<".count)
+            .dropLast()
+
+        return wrappedName.isEmpty ? rawName : String(wrappedName)
+    }
+
     // MARK: - Private Helpers
 
     /// Recursively prints a view controller and its children (tab selection,
@@ -107,7 +149,7 @@ final class ViewControllerTracker {
         _ viewController: UIViewController,
         indent: String
     ) {
-        let name = String(describing: type(of: viewController))
+        let name = Self.screenName(for: viewController)
         print("\(indent)↳ \(name)")
 
         if let tabBar = viewController as? UITabBarController {
@@ -120,8 +162,7 @@ final class ViewControllerTracker {
         if let navigation = viewController as? UINavigationController {
             print("\(indent)   Navigation Stack:")
             for vc in navigation.viewControllers {
-                let vcName = String(describing: type(of: vc))
-                print("\(indent)   • \(vcName)")
+                print("\(indent)   • \(Self.screenName(for: vc))")
             }
             if let visible = navigation.visibleViewController {
                 print("\(indent)   Visible:")

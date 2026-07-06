@@ -19,16 +19,19 @@ The overlay label updates automatically as the user moves from screen to screen 
 
 ## Features
 
-- 📱 **Real-time screen name overlay** — floating pill label shows the active `UIViewController` class name
-- 🔄 **Auto-detection** — uses method swizzling on `viewDidAppear` / `viewDidDisappear`, no manual calls needed
+- 📱 **Real-time screen name overlay** — floating pill label shows the active screen's name
+- 🔄 **Auto-detection (UIKit)** — uses method swizzling on `viewDidAppear` / `viewDidDisappear`, no manual calls needed
+- 🧩 **SwiftUI support** — a `.screenOverlayTrack("ScreenName")` view modifier tracks screens that live entirely inside SwiftUI navigation
 - 👆 **Tap for full path** — tap the label to see the complete hierarchy (nav stack, tab bar, modal chain) for the current screen, with a copy-to-clipboard action
 - 🧭 **Single-line console logging** — every screen change and path lookup is also printed to the Xcode console on one line, easy to search/filter
+- 📊 **Analytics hook** — implement `ScreenOverlayEventLogger` to forward every screen view (and any custom event you log) to Firebase Analytics or any other backend
 - 🫥 **Passthrough touches** — the overlay never blocks your app's own interactions; only the pill itself is interactive
 - ⚡ **Simple setup** — call `ScreenOverlay.enable()` once inside your app's `#if DEBUG` block
 - 🌗 **Dark & light mode support** — overlay automatically adapts to system appearance
 - 🖐️ **Draggable overlay** — optionally drag the label anywhere on screen, snaps to the nearest edge
 - 🔔 **Stays visible above alerts** — the overlay window renders above system alerts and action sheets, so it's never hidden behind them
 - 🛡️ **Debug-only by usage** — wrap `ScreenOverlay.enable()` in `#if DEBUG` so it never runs in production
+- 🌉 **Swift, SwiftUI & Objective-C** — `ScreenOverlay` is a plain `NSObject` subclass with explicit `@objc` entry points, so it's usable from all three
 
 ## Requirements
 
@@ -68,13 +71,16 @@ targets: [
 
 > **Important:** ScreenOverlayKit is a debug tool. Always wrap `ScreenOverlay.enable()` in `#if DEBUG` in your app target. If you call it from a Release build, the overlay will appear for your users.
 
-`ScreenOverlay.enable()` takes one optional parameter:
+`ScreenOverlay.enable()` takes two optional parameters:
 
 | Parameter | Default | Description |
 |---|---|---|
 | `draggable` | `false` | Lets you drag the overlay anywhere on screen; snaps to the nearest edge on release |
+| `showTimeOnTrail` | `false` | Records how long each screen stayed on top, shown in the trail sheet and console/file exports |
 
-### AppDelegate (UIKit)
+ScreenOverlayKit works from **Swift (UIKit)**, **SwiftUI**, and **Objective-C** — pick the section below that matches your project.
+
+### Swift — AppDelegate (UIKit)
 
 ```swift
 import ScreenOverlayKit
@@ -95,7 +101,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 }
 ```
 
-### SceneDelegate (iOS 13+)
+### Swift — SceneDelegate (iOS 13+)
 
 ```swift
 import ScreenOverlayKit
@@ -113,11 +119,101 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 }
 ```
 
-Prefer the plain `ScreenOverlay.enable()` call if you don't need dragging — the parameter is optional and defaults to `false`.
+Prefer the plain `ScreenOverlay.enable()` call if you don't need dragging — both parameters are optional and default to `false`.
 
-> ⚠️ **Objective-C** — ScreenOverlayKit is a Swift-only package today (`ScreenOverlay` is a Swift `enum`, not exposed with `@objc`). Objective-C interop is not currently supported.
+### SwiftUI
 
-> ⚠️ **SwiftUI** — ScreenOverlayKit is UIKit-focused. SwiftUI screens are detected as their wrapping `UIHostingController<ContentView>`, and the label automatically strips that down to just `ContentView` — but native SwiftUI navigation (`NavigationStack`, `.sheet`, etc.) that doesn't go through UIKit view controllers isn't tracked.
+ScreenOverlayKit's automatic detection is UIKit-based (it swizzles `viewDidAppear` / `viewDidDisappear`), so it automatically sees the `UIHostingController` your SwiftUI content is wrapped in — that already covers a single-screen SwiftUI app. Screens navigated to purely within SwiftUI (`NavigationStack` destinations, `.sheet`, `.fullScreenCover`, tab selections, etc.) don't create a new `UIViewController`, so track each of those individually with the `.screenOverlayTrack(_:)` view modifier.
+
+```swift
+import SwiftUI
+import ScreenOverlayKit
+
+@main
+struct MyApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                .screenOverlayTrack("ContentView")
+                .onAppear {
+                    // .onAppear fires once the window scene exists, unlike App.init(),
+                    // which can run before there's a scene for the overlay window to attach to.
+                    #if DEBUG
+                    ScreenOverlay.enable(draggable: true)
+                    #endif
+                }
+        }
+    }
+}
+
+struct ProfileView: View {
+    var body: some View {
+        Text("Profile")
+            .screenOverlayTrack("ProfileView")
+    }
+}
+```
+
+If your app uses `UIApplicationDelegateAdaptor`, you can instead call `ScreenOverlay.enable()` from the adapted `AppDelegate`/`SceneDelegate` exactly as in the UIKit examples above.
+
+### Objective-C
+
+`ScreenOverlay` is a plain `NSObject` subclass with explicit `@objc` entry points, so it's fully usable from Objective-C. Swift's default parameter values don't exist in Objective-C, so a couple of explicit overloads are provided:
+
+```objc
+@import ScreenOverlayKit;
+
+#if DEBUG
+[ScreenOverlay enable];                                          // draggable: NO, showTimeOnTrail: NO
+[ScreenOverlay enableWithDraggable:YES showTimeOnTrail:NO];       // customize both options
+#endif
+
+// Later:
+[ScreenOverlay disable];
+```
+
+## Analytics / Event Logging (Firebase, etc.)
+
+ScreenOverlayKit has **no dependency on Firebase or any analytics SDK**. Instead, it exposes a small `ScreenOverlayEventLogger` protocol — implement it and assign it to `ScreenOverlay.eventLogger` to forward every screen view (and any custom event you log) to whatever backend you use.
+
+```swift
+import ScreenOverlayKit
+import FirebaseAnalytics
+
+final class FirebaseScreenOverlayLogger: NSObject, ScreenOverlayEventLogger {
+    func screenOverlayDidLogScreenView(_ screenName: String, previousScreenName: String?) {
+        Analytics.logEvent(AnalyticsEventScreenView, parameters: [
+            AnalyticsParameterScreenName: screenName
+        ])
+    }
+
+    func screenOverlayDidLogEvent(_ name: String, parameters: [String: Any]?) {
+        Analytics.logEvent(name, parameters: parameters)
+    }
+}
+
+// Keep a strong reference somewhere (e.g. AppDelegate) — `eventLogger` is held weakly.
+let screenOverlayLogger = FirebaseScreenOverlayLogger()
+
+#if DEBUG
+ScreenOverlay.enable()
+ScreenOverlay.eventLogger = screenOverlayLogger
+#endif
+```
+
+Every screen view recorded by ScreenOverlayKit — whether from automatic UIKit tracking or `.screenOverlayTrack(_:)` in SwiftUI — calls `screenOverlayDidLogScreenView(_:previousScreenName:)`. For anything else the user does (button taps, form submissions, feature usage), log it explicitly:
+
+```swift
+ScreenOverlay.logEvent(name: "checkout_button_tapped", parameters: ["cart_items": 3])
+```
+
+From Objective-C:
+
+```objc
+[ScreenOverlay logEventWithName:@"checkout_button_tapped" parameters:@{@"cart_items": @3}];
+```
+
+Because `eventLogger` is a plain protocol rather than a hard dependency, the exact same pattern works for Mixpanel, Amplitude, or an in-house logging pipeline — just implement the two methods and point them wherever you want.
 
 ## Draggable Overlay
 
@@ -163,11 +259,44 @@ Make sure `UIUserInterfaceStyle` is not forced in your Info.plist, otherwise the
 
 | Component | Responsibility |
 |---|---|
-| `ScreenOverlay` | Public entry point (`enable()` / `disable()`) |
+| `ScreenOverlay` | Public entry point (`enable()` / `disable()` / `logEvent(name:parameters:)` / `eventLogger`) |
+| `ScreenOverlayEventLogger` | Protocol you implement to forward screen views & custom events to Firebase or any analytics backend |
 | `UIViewController+Swizzling` | Hooks into `viewDidAppear` & `viewDidDisappear` via Objective-C runtime swizzling |
+| `View+ScreenOverlayTracking` | SwiftUI `.screenOverlayTrack(_:)` view modifier for screens with no backing `UIViewController` |
 | `ViewControllerTracker` | Resolves the topmost visible VC from the window hierarchy; builds the full path on tap |
-| `OverlayWindow` | Creates a `UIWindow` above system alerts, hosting the floating pill label |
+| `TrailLogger` | Records the current/previous session's screen trail and notifies `ScreenOverlay.eventLogger` |
+| `OverlayManager` | Creates the `PassthroughWindow` above system alerts and drives the pill label's position/drag/tap behavior |
+| `OverlayLabel` | The pill label itself — owns its light/dark-mode styling and padded-text layout |
 | `PassthroughWindow` | Overrides `hitTest` so touches fall through to the app beneath, except on the pill itself |
+
+### Folder Structure
+
+```
+Sources/ScreenOverlayKit
+│
+├── Public
+│   ├── ScreenOverlay.swift              — enable()/disable()/logEvent()/eventLogger
+│   └── ScreenOverlayEventLogger.swift   — analytics-forwarding protocol
+│
+├── Overlay
+│   ├── OverlayManager.swift             — window lifecycle, dragging, positioning, tap handling
+│   ├── OverlayLabel.swift               — the pill label's styling & sizing
+│   └── PassthroughWindow.swift          — the UIWindow that lets touches fall through
+│
+├── Tracker
+│   └── ViewControllerTracker.swift      — resolves the top-most VC, prints the hierarchy
+│
+├── Trail
+│   ├── TrailEntry.swift                 — one recorded step in the screen trail
+│   ├── TrailLogger.swift                — records/persists/exports the trail
+│   └── TrailBottomSheet.swift           — the tap-to-view trail UI
+│
+├── Swizzling
+│   └── UIViewController+Swizzling.swift — hooks viewDidAppear/viewDidDisappear
+│
+└── Extensions
+    └── View+ScreenOverlayTracking.swift — SwiftUI `.screenOverlayTrack(_:)` modifier
+```
 
 ## Console Output
 
