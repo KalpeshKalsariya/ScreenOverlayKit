@@ -7,7 +7,7 @@ import SwiftUI
 
 public extension View {
 
-    /// Tracks this view as a distinct screen in the ScreenOverlayKit overlay, console log, and trail.
+    /// Tracks this view as a distinct screen in the ScreenOverlayKit overlay, console log, and session.
     ///
     /// ScreenOverlayKit's automatic tracking is UIKit-based (it swizzles `viewDidAppear`/
     /// `viewDidDisappear`), so it only sees the `UIHostingController` wrapping your SwiftUI
@@ -24,7 +24,7 @@ public extension View {
     /// }
     /// ```
     ///
-    /// - Parameter name: The screen's display name, shown in the overlay label, console log, and trail.
+    /// - Parameter name: The screen's display name, shown in the overlay label, console log, and session.
     /// - Returns: A view that reports its appearance/disappearance to ScreenOverlayKit.
     func screenOverlayTrack(_ name: String) -> some View {
         modifier(ScreenOverlayTrackingModifier(screenName: name))

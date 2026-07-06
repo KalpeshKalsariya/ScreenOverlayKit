@@ -52,7 +52,7 @@ public final class ScreenOverlay: NSObject {
     }
 
     /// Forwards a screen-view notification to `eventLogger`. Called internally whenever the
-    /// trail records a new screen, from both the UIKit swizzling path and `.screenOverlayTrack(_:)`.
+    /// session records a new screen, from both the UIKit swizzling path and `.screenOverlayTrack(_:)`.
     ///
     /// - Parameters:
     ///   - screenName: The new screen's name.
@@ -62,18 +62,18 @@ public final class ScreenOverlay: NSObject {
         eventLogger?.screenOverlayDidLogScreenView(screenName, previousScreenName: previousScreenName)
     }
 
-    // MARK: - Current Screen Lookup
+    // MARK: - Current Screen & Session Lookup
 
     /// The name of the current top-most tracked screen, without presenting any UI.
     ///
     /// Reflects whichever screen was most recently recorded — whether from automatic UIKit
     /// tracking or `.screenOverlayTrack(_:)` in SwiftUI. Use this to tag a Firebase (or any
-    /// other) event with the active screen, instead of tapping the overlay to open the trail sheet.
+    /// other) event with the active screen.
     ///
     /// - Note: Returns `nil` until `enable()` has recorded at least one screen.
     @MainActor
     public static var currentScreenName: String? {
-        TrailLogger.shared.currentScreenName
+        SessionRecorder.shared.currentScreenName
     }
 
     /// A single-line breadcrumb of the current view controller hierarchy — e.g.
@@ -91,41 +91,55 @@ public final class ScreenOverlay: NSObject {
         ViewControllerTracker.shared.currentHierarchyPath()
     }
 
+    /// The full breadcrumb path recorded for every screen visited so far in the current app
+    /// session, oldest first — e.g. `["Root → Home", "Root → Home → ProfileView"]`.
+    @MainActor
+    public static var currentSessionPaths: [String] {
+        SessionRecorder.shared.currentSessionPaths.map(\.path)
+    }
+
+    /// The full breadcrumb paths recorded during the previous app session, persisted across
+    /// launches, oldest first.
+    @MainActor
+    public static var previousSessionPaths: [String] {
+        SessionRecorder.shared.previousSessionPaths.map(\.path)
+    }
+
     // MARK: - Public API
 
     /// Enables the ScreenOverlay overlay.
     ///
     /// Shows a floating pill label at the top of the screen with the current view controller's
-    /// class name, and starts recording the screen trail used by the tap-to-view hierarchy sheet.
+    /// class name, and starts recording the current session's screen paths (see `currentSessionPaths`).
     ///
     /// - Parameters:
     ///   - draggable: When `true`, the overlay label can be dragged anywhere on screen
     ///     and snaps to the nearest edge on release. Defaults to `false`.
-    ///   - showTimeOnTrail: When `true`, the trail sheet also shows how long the app
+    ///   - trackScreenDuration: When `true`, session entries also record how long the app
     ///     spent on each screen. Defaults to `false`.
     ///
     /// - Note: Call this once, ideally in `AppDelegate.application(_:didFinishLaunchingWithOptions:)`,
     ///   `SceneDelegate.scene(_:willConnectTo:options:)`, or a SwiftUI view's `.onAppear`.
     ///   Wrap in `#if DEBUG` to ensure it is never shipped to production.
-    @objc(enableWithDraggable:showTimeOnTrail:)
+    @objc(enableWithDraggable:trackScreenDuration:)
     @MainActor
     public static func enable(
         draggable: Bool = false,
-        showTimeOnTrail: Bool = false
+        trackScreenDuration: Bool = false
     ) {
         print("🚀 ScreenOverlayKit enabled")
         DispatchQueue.main.async {
-            TrailLogger.shared.startSession(showTimeOnTrail: showTimeOnTrail)
+            SessionRecorder.shared.startSession(trackScreenDuration: trackScreenDuration)
             OverlayManager.shared.show(draggable: draggable)
             UIViewController.enableScreenOverlayTracking()
             ViewControllerTracker.shared.refresh()
-            ViewControllerTracker.shared.seedCurrentVisibleTrail()
+            ViewControllerTracker.shared.seedCurrentVisibleSession()
         }
     }
 
-    /// Objective-C convenience for `enable(draggable:showTimeOnTrail:)` using its default
-    /// options (`draggable: false, showTimeOnTrail: false`) — Objective-C has no concept of
-    /// default parameter values. Swift callers should use `enable(draggable:showTimeOnTrail:)` directly.
+    /// Objective-C convenience for `enable(draggable:trackScreenDuration:)` using its default
+    /// options (`draggable: false, trackScreenDuration: false`) — Objective-C has no concept of
+    /// default parameter values. Swift callers should use `enable(draggable:trackScreenDuration:)` directly.
     @objc(enable)
     @MainActor
     public static func enableWithDefaultOptions() {

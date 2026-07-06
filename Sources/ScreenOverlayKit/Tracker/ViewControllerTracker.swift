@@ -8,7 +8,7 @@
 import UIKit
 
 /// Resolves the currently visible `UIViewController` from the app's window
-/// hierarchy, and coordinates updates to the overlay label and trail logger.
+/// hierarchy, and coordinates updates to the overlay label and session recorder.
 @MainActor
 final class ViewControllerTracker {
 
@@ -60,29 +60,29 @@ final class ViewControllerTracker {
         """)
     }
 
-    /// Forwards a screen-appeared event to `TrailLogger`.
+    /// Forwards a screen-appeared event to `SessionRecorder`.
     ///
     /// - Parameter viewController: The view controller that just appeared.
     func recordAppear(for viewController: UIViewController) {
-        TrailLogger.shared.recordAppear(for: viewController)
+        SessionRecorder.shared.recordAppear(for: viewController)
     }
 
-    /// Forwards a screen-disappeared event to `TrailLogger`.
+    /// Forwards a screen-disappeared event to `SessionRecorder`.
     ///
     /// - Parameter viewController: The view controller that just disappeared.
     func recordDisappear(for viewController: UIViewController) {
-        TrailLogger.shared.recordDisappear(for: viewController)
+        SessionRecorder.shared.recordDisappear(for: viewController)
     }
 
     /// Records that a manually-tracked SwiftUI screen appeared, updating the overlay label and
-    /// console log in addition to the trail — used by the `.screenOverlayTrack(_:)` view modifier.
+    /// console log in addition to the session — used by the `.screenOverlayTrack(_:)` view modifier.
     ///
     /// - Parameters:
     ///   - screenName: The screen's display name.
     ///   - token: A stable per-screen-instance identity used to dedupe repeated appearances and
     ///     to pair this appearance with its matching disappearance.
     func recordManualAppear(screenName: String, token: AnyObject) {
-        guard TrailLogger.shared.recordManualAppear(screenName: screenName, token: token) else { return }
+        guard SessionRecorder.shared.recordManualAppear(screenName: screenName, token: token) else { return }
         print("📱 ScreenOverlay → \(screenName)")
         OverlayManager.shared.update(text: screenName)
     }
@@ -92,7 +92,7 @@ final class ViewControllerTracker {
     ///
     /// - Parameter token: The identity object passed to the matching `recordManualAppear` call.
     func recordManualDisappear(token: AnyObject) {
-        TrailLogger.shared.recordManualDisappear(token: token)
+        SessionRecorder.shared.recordManualDisappear(token: token)
     }
 
     /// Checks whether a given view controller is currently the top-most visible screen.
@@ -103,10 +103,10 @@ final class ViewControllerTracker {
         topViewController() === viewController
     }
 
-    /// Seeds the trail logger with whatever hierarchy is currently visible,
-    /// so the very first screen shows up in the trail.
-    func seedCurrentVisibleTrail() {
-        TrailLogger.shared.seedInitialTrail(with: visibleTrail())
+    /// Seeds the session recorder with whatever hierarchy is currently visible,
+    /// so the very first screen is recorded.
+    func seedCurrentVisibleSession() {
+        SessionRecorder.shared.seedInitialSession(with: visibleScreens())
     }
 
     /// Returns the current top-most visible view controller.
@@ -119,8 +119,7 @@ final class ViewControllerTracker {
     /// Builds a single-line breadcrumb of the currently visible hierarchy — e.g.
     /// `"AppRootViewController → UITabBarController → UINavigationController → ProfileViewController"` —
     /// without printing anything to the console or presenting any UI. Use this to tag
-    /// analytics events (Firebase or otherwise) with the current screen context on demand,
-    /// instead of relying on the user tapping the overlay to open `TrailBottomSheet`.
+    /// analytics events (Firebase or otherwise) with the current screen context on demand.
     ///
     /// - Returns: The breadcrumb string, or a placeholder if no root view controller could be resolved.
     func currentHierarchyPath() -> String {
@@ -267,26 +266,26 @@ final class ViewControllerTracker {
     ///
     /// - Parameter viewController: The view controller to start from, or `nil` to start from the root.
     /// - Returns: The visible view controllers, root-first.
-    private func visibleTrail(
+    private func visibleScreens(
         from viewController: UIViewController? = nil
     ) -> [UIViewController] {
         guard let vc = viewController ?? rootViewController() else { return [] }
 
         if let navigation = vc as? UINavigationController {
-            var trail = navigation.viewControllers
+            var screens = navigation.viewControllers
             if let presented = navigation.visibleViewController?.presentedViewController {
-                trail.append(contentsOf: visibleTrail(from: presented))
+                screens.append(contentsOf: visibleScreens(from: presented))
             }
-            return trail
+            return screens
         }
 
         if let tabBar = vc as? UITabBarController {
             guard let selected = tabBar.selectedViewController else { return [tabBar] }
-            return visibleTrail(from: selected)
+            return visibleScreens(from: selected)
         }
 
         if let presented = vc.presentedViewController {
-            return [vc] + visibleTrail(from: presented)
+            return [vc] + visibleScreens(from: presented)
         }
 
         return [vc]

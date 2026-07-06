@@ -163,24 +163,9 @@ final class OverlayManager {
 
     // MARK: - Gesture Handlers
 
-    /// Handles a tap on the pill label by printing the hierarchy/trail to the
-    /// console and presenting the trail bottom sheet.
+    /// Handles a tap on the pill label by printing the current hierarchy to the console.
     @objc private func labelTapped() {
         ViewControllerTracker.shared.printHierarchy()
-        TrailLogger.shared.printTrail()
-        presentTrailBottomSheet()
-    }
-
-    /// Presents the `TrailBottomSheet` on top of the overlay window, if nothing
-    /// else is already presented.
-    private func presentTrailBottomSheet() {
-        guard let rootViewController = window?.rootViewController,
-              rootViewController.presentedViewController == nil
-        else { return }
-
-        let trailBottomSheet = TrailBottomSheet()
-        trailBottomSheet.modalPresentationStyle = .overFullScreen
-        rootViewController.present(trailBottomSheet, animated: true)
     }
 
     /// Handles a pan gesture on the pill label, dragging it and snapping it to
