@@ -18,12 +18,27 @@ final class ViewControllerTracker {
 
     private init() {}
 
+    // MARK: - Private Properties
+
+    /// The screen name last printed/rendered by `refresh()`, so redundant calls for a screen
+    /// that's already current (e.g. every container in the hierarchy firing `viewDidAppear`
+    /// together at launch) don't re-print/re-render it.
+    private var lastReportedScreenName: String?
+
     // MARK: - Public Methods
 
     /// Refreshes the overlay label with the current top view controller name.
+    ///
+    /// No-ops if the resolved top screen hasn't changed since the last call — `refresh()` is
+    /// called from every view controller's `viewDidAppear` in the hierarchy, and several of
+    /// them (e.g. a wrapping `UINavigationController`/`UITabBarController`) can all resolve to
+    /// the same top-most screen in a single burst, most notably at launch.
     func refresh() {
         guard let vc = topViewController() else { return }
         let screenName = Self.screenName(for: vc)
+        guard screenName != lastReportedScreenName else { return }
+
+        lastReportedScreenName = screenName
         print("📱 ScreenOverlay → \(screenName)")
         OverlayManager.shared.update(text: screenName)
     }
