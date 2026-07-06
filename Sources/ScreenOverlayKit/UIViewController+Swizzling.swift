@@ -1,34 +1,66 @@
+//
+//  UIViewController+Swizzling.swift
+//  ScreenRadarKit
+//
+//  Created by Sanket Khatri on 05/06/26.
+//
+
 import UIKit
+import ObjectiveC.runtime
 
 extension UIViewController {
 
-    /// Swaps `viewDidAppear(_:)` and `viewDidDisappear(_:)` with our tracking
-    /// implementations exactly once per process, so every view controller in
-    /// the app reports automatically — no manual calls needed at each screen.
-    static func so_swizzleLifecycleMethods() {
-        swizzle(original: #selector(viewDidAppear(_:)),    swizzled: #selector(so_viewDidAppear(_:)))
-        swizzle(original: #selector(viewDidDisappear(_:)), swizzled: #selector(so_viewDidDisappear(_:)))
+    /// Swizzles `viewDidAppear(_:)` and `viewDidDisappear(_:)` once,
+    /// so ScreenRadar can auto-detect screen transitions.
+    static func enableScreenRadarTracking() {
+        _ = swizzleToken
     }
 
-    // MARK: - Private
+    // One-time swizzle token to avoid nested type capturing self
+    private static let swizzleToken: Void = {
+        // MARK: viewDidAppear
+        swizzle(
+            original: #selector(viewDidAppear(_:)),
+            swizzled: #selector(sr_viewDidAppear(_:))
+        )
 
-    private static func swizzle(original: Selector, swizzled: Selector) {
+        // MARK: viewDidDisappear
+        swizzle(
+            original: #selector(viewDidDisappear(_:)),
+            swizzled: #selector(sr_viewDidDisappear(_:))
+        )
+    }()
+
+    // MARK: - Private Swizzle Helper
+
+    private static func swizzle(
+        original originalSelector: Selector,
+        swizzled swizzledSelector: Selector
+    ) {
         guard
-            let originalMethod = class_getInstanceMethod(UIViewController.self, original),
-            let swizzledMethod  = class_getInstanceMethod(UIViewController.self, swizzled)
+            let original = class_getInstanceMethod(UIViewController.self, originalSelector),
+            let swizzled = class_getInstanceMethod(UIViewController.self, swizzledSelector)
         else { return }
-        method_exchangeImplementations(originalMethod, swizzledMethod)
+        method_exchangeImplementations(original, swizzled)
     }
 
-    /// After the swap this name resolves to the original `viewDidAppear` implementation.
-    @objc private func so_viewDidAppear(_ animated: Bool) {
-        so_viewDidAppear(animated)
-        ScreenOverlay.viewControllerDidAppear(self)
+    // MARK: - Swizzled viewDidAppear
+
+    @objc private func sr_viewDidAppear(_ animated: Bool) {
+        sr_viewDidAppear(animated) // calls original implementation
+        DispatchQueue.main.async {
+            ViewControllerTracker.shared.recordAppear(for: self)
+            ViewControllerTracker.shared.refresh()
+        }
     }
 
-    /// After the swap this name resolves to the original `viewDidDisappear` implementation.
-    @objc private func so_viewDidDisappear(_ animated: Bool) {
-        so_viewDidDisappear(animated)
-        ScreenOverlay.viewControllerDidDisappear(self)
+    // MARK: - Swizzled viewDidDisappear
+
+    @objc private func sr_viewDidDisappear(_ animated: Bool) {
+        sr_viewDidDisappear(animated) // calls original implementation
+        DispatchQueue.main.async {
+            ViewControllerTracker.shared.recordDisappear(for: self)
+            ViewControllerTracker.shared.refresh()
+        }
     }
 }
