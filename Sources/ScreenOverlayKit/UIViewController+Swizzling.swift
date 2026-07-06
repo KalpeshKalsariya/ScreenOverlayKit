@@ -1,6 +1,6 @@
 //
 //  UIViewController+Swizzling.swift
-//  ScreenRadarKit
+//  ScreenOverlayKit
 //
 //  Created by Sanket Khatri on 05/06/26.
 //
@@ -11,8 +11,8 @@ import ObjectiveC.runtime
 extension UIViewController {
 
     /// Swizzles `viewDidAppear(_:)` and `viewDidDisappear(_:)` once,
-    /// so ScreenRadar can auto-detect screen transitions.
-    static func enableScreenRadarTracking() {
+    /// so ScreenOverlayKit can auto-detect screen transitions.
+    static func enableScreenOverlayTracking() {
         _ = swizzleToken
     }
 
@@ -21,18 +21,23 @@ extension UIViewController {
         // MARK: viewDidAppear
         swizzle(
             original: #selector(viewDidAppear(_:)),
-            swizzled: #selector(sr_viewDidAppear(_:))
+            swizzled: #selector(overlayKit_viewDidAppear(_:))
         )
 
         // MARK: viewDidDisappear
         swizzle(
             original: #selector(viewDidDisappear(_:)),
-            swizzled: #selector(sr_viewDidDisappear(_:))
+            swizzled: #selector(overlayKit_viewDidDisappear(_:))
         )
     }()
 
     // MARK: - Private Swizzle Helper
 
+    /// Exchanges the implementations of two instance methods on `UIViewController`.
+    ///
+    /// - Parameters:
+    ///   - originalSelector: The selector whose implementation should be replaced.
+    ///   - swizzledSelector: The selector providing the replacement implementation.
     private static func swizzle(
         original originalSelector: Selector,
         swizzled swizzledSelector: Selector
@@ -46,8 +51,12 @@ extension UIViewController {
 
     // MARK: - Swizzled viewDidAppear
 
-    @objc private func sr_viewDidAppear(_ animated: Bool) {
-        sr_viewDidAppear(animated) // calls original implementation
+    /// Replacement for `viewDidAppear(_:)` that calls through to the original
+    /// implementation, then notifies ScreenOverlayKit that this screen appeared.
+    ///
+    /// - Parameter animated: Whether the appearance was animated, forwarded to the original implementation.
+    @objc private func overlayKit_viewDidAppear(_ animated: Bool) {
+        overlayKit_viewDidAppear(animated) // calls original implementation
         DispatchQueue.main.async {
             ViewControllerTracker.shared.recordAppear(for: self)
             ViewControllerTracker.shared.refresh()
@@ -56,8 +65,12 @@ extension UIViewController {
 
     // MARK: - Swizzled viewDidDisappear
 
-    @objc private func sr_viewDidDisappear(_ animated: Bool) {
-        sr_viewDidDisappear(animated) // calls original implementation
+    /// Replacement for `viewDidDisappear(_:)` that calls through to the original
+    /// implementation, then notifies ScreenOverlayKit that this screen disappeared.
+    ///
+    /// - Parameter animated: Whether the disappearance was animated, forwarded to the original implementation.
+    @objc private func overlayKit_viewDidDisappear(_ animated: Bool) {
+        overlayKit_viewDidDisappear(animated) // calls original implementation
         DispatchQueue.main.async {
             ViewControllerTracker.shared.recordDisappear(for: self)
             ViewControllerTracker.shared.refresh()

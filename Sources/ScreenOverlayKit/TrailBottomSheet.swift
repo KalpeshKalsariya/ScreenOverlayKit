@@ -1,12 +1,14 @@
 //
 //  TrailBottomSheet.swift
-//  ScreenRadarKit
+//  ScreenOverlayKit
 //
 //  Created by Sanket Khatri on 01/07/26.
 //
 
 import UIKit
 
+/// A bottom sheet shown when the overlay label is tapped, listing the current
+/// and previous session's screen trails with export/clear actions.
 @MainActor
 final class TrailBottomSheet: UIViewController {
 
@@ -22,6 +24,7 @@ final class TrailBottomSheet: UIViewController {
 
     // MARK: - Lifecycle
 
+    /// Builds the sheet's view hierarchy and loads the trail data.
     override func viewDidLoad() {
         super.viewDidLoad()
         modalPresentationStyle = .overFullScreen
@@ -31,6 +34,8 @@ final class TrailBottomSheet: UIViewController {
 
     // MARK: - Setup
 
+    /// Builds and lays out the dimming backdrop, header, scrollable trail
+    /// list, and action buttons.
     private func configureViews() {
         view.backgroundColor = .clear
 
@@ -173,6 +178,7 @@ final class TrailBottomSheet: UIViewController {
         ])
     }
 
+    /// Clears and rebuilds the trail list from `TrailLogger`'s current data.
     private func reloadTrail() {
         stackView.arrangedSubviews.forEach {
             stackView.removeArrangedSubview($0)
@@ -195,6 +201,8 @@ final class TrailBottomSheet: UIViewController {
         updateClearActions()
     }
 
+    /// Shows/hides and re-titles the clear buttons based on whether a
+    /// previous trail exists.
     private func updateClearActions() {
         let hasPreviousTrail = !TrailLogger.shared.previousTrail.isEmpty
         clearPreviousButton?.isHidden = !hasPreviousTrail
@@ -206,6 +214,13 @@ final class TrailBottomSheet: UIViewController {
         }
     }
 
+    /// Appends a titled section (with a row per entry, or an empty-state label) to `stackView`.
+    ///
+    /// - Parameters:
+    ///   - title: The section header text.
+    ///   - entries: The trail entries to render as rows.
+    ///   - emptyText: Text shown when `entries` is empty.
+    ///   - showsCurrentIndicator: Whether the last entry should be marked as the current screen.
     private func addSection(
         title: String,
         entries: [TrailEntry],
@@ -239,6 +254,13 @@ final class TrailBottomSheet: UIViewController {
         }
     }
 
+    /// Builds a single row (index, screen name, detail) for the trail list.
+    ///
+    /// - Parameters:
+    ///   - index: The entry's position within its section, used for the leading number.
+    ///   - entry: The trail entry to render.
+    ///   - isCurrent: Whether this row represents the currently active screen.
+    /// - Returns: The assembled row view.
     private func row(index: Int, entry: TrailEntry, isCurrent: Bool) -> UIView {
         let numberLabel = UILabel()
         numberLabel.text = String(format: "%02d.", index + 1)
@@ -265,6 +287,12 @@ final class TrailBottomSheet: UIViewController {
         return rowStack
     }
 
+    /// Builds the trailing detail text for a row (current indicator or duration).
+    ///
+    /// - Parameters:
+    ///   - entry: The trail entry being rendered.
+    ///   - isCurrent: Whether this entry is the currently active screen.
+    /// - Returns: The detail text to display, possibly empty.
     private func detailText(for entry: TrailEntry, isCurrent: Bool) -> String {
         if isCurrent {
             return "← current"
@@ -286,20 +314,24 @@ final class TrailBottomSheet: UIViewController {
 
     // MARK: - Actions
 
+    /// Dismisses the sheet.
     @objc private func closeTapped() {
         dismiss(animated: true)
     }
 
+    /// Clears the current trail (restarting from the active screen) and reloads the list.
     @objc private func clearTapped() {
         TrailLogger.shared.clearTrailRestartingFromCurrentScreen()
         reloadTrail()
     }
 
+    /// Clears the previous session's trail and reloads the list.
     @objc private func clearPreviousTapped() {
         TrailLogger.shared.clearPreviousTrail()
         reloadTrail()
     }
 
+    /// Presents an action sheet letting the user export the current or previous session's trail.
     @objc private func exportTapped() {
         let actionSheet = UIAlertController(
             title: "Export Trail",
@@ -327,6 +359,9 @@ final class TrailBottomSheet: UIViewController {
         present(actionSheet, animated: true)
     }
 
+    /// Presents a share sheet for the given file, anchored near the bottom of the view.
+    ///
+    /// - Parameter fileURL: The file to share; if `nil`, this is a no-op.
     private func share(fileURL: URL?) {
         guard let fileURL else { return }
 
