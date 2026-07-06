@@ -25,10 +25,20 @@ final class SessionRecorder {
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
-    /// The currently tracked screen's identity token, used to dedupe repeated appearances and
-    /// pair an appearance with its matching disappearance. A `UIViewController` instance for
-    /// automatic tracking, or a per-instance token for manually-tracked SwiftUI screens.
+    /// The currently tracked screen's identity token, used to dedupe repeated appearances.
+    /// A `UIViewController` instance for automatic tracking, or a per-instance token for
+    /// manually-tracked SwiftUI screens.
     private var currentScreenToken: AnyObject?
+
+    /// Maps each screen's identity token to the `currentSessionPaths` index it was recorded at.
+    ///
+    /// A disappearing screen can't be paired with its entry by comparing against
+    /// `currentScreenToken` — the *next* screen's `viewDidAppear` always fires (and updates
+    /// `currentScreenToken`) before this screen's `viewDidDisappear` does, so `currentScreenToken`
+    /// has already moved on by the time this screen's disappearance is recorded. This map lets
+    /// `recordDisappearance` find the exact entry that belongs to the token it was given.
+    private var entryIndexByToken: [ObjectIdentifier: Int] = [:]
+
     private var didStartSession = false
 
     // MARK: - Public Properties
@@ -147,6 +157,7 @@ final class SessionRecorder {
         let previousScreenName = currentScreenName
         currentScreenToken = token
         currentSessionPaths.append(SessionPathEntry(path: path, timestamp: Date(), duration: nil))
+        entryIndexByToken[ObjectIdentifier(token)] = currentSessionPaths.count - 1
         saveCurrentSession()
 
         let newScreenName = path.components(separatedBy: " → ").last ?? path
@@ -154,18 +165,18 @@ final class SessionRecorder {
         return true
     }
 
-    /// Stamps the duration of the currently tracked screen if `token` matches it, and prints
-    /// how long it stayed on top — whether the user navigated forward, back, or dismissed it.
+    /// Stamps the duration of the screen `token` belongs to, and prints how long it stayed on
+    /// top — whether the user navigated forward, back, or dismissed it.
     ///
     /// - Parameter token: The identity object of the screen that disappeared.
     private func recordDisappearance(token: AnyObject) {
         guard trackScreenDuration else { return }
-        guard currentScreenToken === token else { return }
-        guard let lastIndex = currentSessionPaths.indices.last else { return }
+        guard let index = entryIndexByToken.removeValue(forKey: ObjectIdentifier(token)) else { return }
+        guard currentSessionPaths.indices.contains(index) else { return }
 
-        let entry = currentSessionPaths[lastIndex]
+        let entry = currentSessionPaths[index]
         let duration = Date().timeIntervalSince(entry.timestamp)
-        currentSessionPaths[lastIndex].duration = duration
+        currentSessionPaths[index].duration = duration
         saveCurrentSession()
 
         let screenName = entry.path.components(separatedBy: " → ").last ?? entry.path
