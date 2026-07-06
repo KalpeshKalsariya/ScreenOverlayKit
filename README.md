@@ -2,7 +2,7 @@
 
 # ScreenOverlayKit
 
-A lightweight debug tool for iOS developers to instantly see which screen they're on while testing their app — plus a separate, production-ready guard against screenshots, screen recording, and shoulder-surfing.
+A lightweight debug tool for iOS developers to instantly see which screen they're on while testing their app.
 
 </div>
 
@@ -17,8 +17,6 @@ https://github.com/user-attachments/assets/94611da2-581f-4ceb-96f1-ed5e4431c991
 
 The overlay label updates automatically as you move from screen to screen — no manual calls needed. Tapping the label prints the full view-controller hierarchy (nav stack → tab → modal chain) to the console, and the label can be dragged to any edge of the screen.
 
-ScreenOverlayKit also ships `ScreenCaptureGuard`, a separate, production-safe feature that detects screenshots, screen recording/mirroring, and app backgrounding, and automatically blurs any screen you mark as sensitive.
-
 ## Table of Contents
 
 - [Features](#features)
@@ -26,8 +24,7 @@ ScreenOverlayKit also ships `ScreenCaptureGuard`, a separate, production-safe fe
 - [Installation (Swift Package Manager)](#installation-swift-package-manager)
 - [Quick Start](#quick-start)
 - [Usage](#usage)
-- [Analytics and Firebase Logging](#analytics-and-firebase-logging)
-- [Capture Protection](#capture-protection)
+- [Looking Up the Current Screen or Session, Without Any UI](#looking-up-the-current-screen-or-session-without-any-ui)
 - [Draggable Overlay](#draggable-overlay)
 - [Tap to Print the Full Hierarchy](#tap-to-print-the-full-hierarchy)
 - [Dark & Light Mode](#dark--light-mode)
@@ -38,26 +35,17 @@ ScreenOverlayKit also ships `ScreenCaptureGuard`, a separate, production-safe fe
 
 ## Features
 
-**Debug overlay** (`ScreenOverlay`, wrap in `#if DEBUG`):
 - 📱 **Real-time screen name overlay** — floating pill label shows the active screen's name
 - 🔄 **Auto-detection (UIKit)** — uses method swizzling on `viewDidAppear` / `viewDidDisappear`, no manual calls needed
 - 🧩 **SwiftUI support** — a `.screenOverlayTrack("ScreenName")` view modifier tracks screens that live entirely inside SwiftUI navigation
 - 🌳 **Full hierarchy on every screen change** — the complete hierarchy (nav stack, tab bar, modal chain) prints to the console automatically on every navigation; tap the label to print it on demand too
 - 🧵 **Session history with full paths** — every screen visited during the current (and previous) session is recorded as a full breadcrumb path, queryable any time — no UI needed
-- 📊 **Analytics hook** — implement `ScreenOverlayEventLogger` to forward every screen view (and any custom event you log) to Firebase Analytics or any other backend
 - 🫥 **Passthrough touches** — the overlay never blocks your app's own interactions; only the pill itself is interactive
 - ⚡ **Simple setup** — call `ScreenOverlay.enable()` once inside your app's `#if DEBUG` block
 - 🌗 **Dark & light mode support** — overlay automatically adapts to system appearance
 - 🖐️ **Draggable overlay** — optionally drag the label anywhere on screen, snaps to the nearest edge
 - 🔔 **Stays visible above alerts** — the overlay window renders above system alerts and action sheets, so it's never hidden behind them
-
-**Capture protection** (`ScreenCaptureGuard`, production-ready — not debug-only):
-- 📸 **Screenshot detection** — reacts after the fact (iOS has no API to block a screenshot before it's saved)
-- 🔴 **Screen recording / mirroring detection** — reacts for the entire duration `UIScreen.isCaptured` is `true` (recording, AirPlay, external displays)
-- 🕶️ **App Switcher protection** — blurs sensitive screens the instant the app resigns active, before the system snapshot is taken
-- 🫧 **Blur sensitive screens only** — opt in per-screen with `markScreenAsSensitiveOverlay()` (UIKit) or `.sensitiveScreenOverlay()` (SwiftUI); everything else is left alone
-
-**Both work from Swift, SwiftUI, and Objective-C** — `ScreenOverlay` and `ScreenCaptureGuard` are `NSObject` subclasses with explicit `@objc` entry points.
+- 🌉 **Swift, SwiftUI & Objective-C** — `ScreenOverlay` is a plain `NSObject` subclass with explicit `@objc` entry points, so it's usable from all three
 
 ## Requirements
 
@@ -121,8 +109,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 Build and run. You'll see a small pill label appear at the top of the screen showing the name of whatever screen is currently visible — it updates automatically as you navigate, no further code needed.
 
-- Building a **SwiftUI** app, need **Objective-C**, or want the draggable/session/analytics options? See [Usage](#usage) below for the full walkthrough of each.
-- Want to protect sensitive screens from screenshots and screen recording (works in production, not just debug builds)? See [Capture Protection](#capture-protection).
+- Building a **SwiftUI** app, need **Objective-C**, or want the draggable/session-tracking options? See [Usage](#usage) below for the full walkthrough of each.
 
 ## Usage
 
@@ -229,52 +216,9 @@ If your app uses `UIApplicationDelegateAdaptor`, you can instead call `ScreenOve
 [ScreenOverlay disable];
 ```
 
-## Analytics and Firebase Logging
+## Looking Up the Current Screen or Session, Without Any UI
 
-ScreenOverlayKit has **no dependency on Firebase or any analytics SDK**. Instead, it exposes a small `ScreenOverlayEventLogger` protocol — implement it and assign it to `ScreenOverlay.eventLogger` to forward every screen view (and any custom event you log) to whatever backend you use.
-
-```swift
-import ScreenOverlayKit
-import FirebaseAnalytics
-
-final class FirebaseScreenOverlayLogger: NSObject, ScreenOverlayEventLogger {
-    func screenOverlayDidLogScreenView(_ screenName: String, previousScreenName: String?) {
-        Analytics.logEvent(AnalyticsEventScreenView, parameters: [
-            AnalyticsParameterScreenName: screenName
-        ])
-    }
-
-    func screenOverlayDidLogEvent(_ name: String, parameters: [String: Any]?) {
-        Analytics.logEvent(name, parameters: parameters)
-    }
-}
-
-// Keep a strong reference somewhere (e.g. AppDelegate) — `eventLogger` is held weakly.
-let screenOverlayLogger = FirebaseScreenOverlayLogger()
-
-#if DEBUG
-ScreenOverlay.enable()
-ScreenOverlay.eventLogger = screenOverlayLogger
-#endif
-```
-
-Every screen view recorded by ScreenOverlayKit — whether from automatic UIKit tracking or `.screenOverlayTrack(_:)` in SwiftUI — calls `screenOverlayDidLogScreenView(_:previousScreenName:)`. For anything else the user does (button taps, form submissions, feature usage), log it explicitly:
-
-```swift
-ScreenOverlay.logEvent(name: "checkout_button_tapped", parameters: ["cart_items": 3])
-```
-
-From Objective-C:
-
-```objc
-[ScreenOverlay logEventWithName:@"checkout_button_tapped" parameters:@{@"cart_items": @3}];
-```
-
-Because `eventLogger` is a plain protocol rather than a hard dependency, the exact same pattern works for Mixpanel, Amplitude, or an in-house logging pipeline — just implement the two methods and point them wherever you want.
-
-### Looking Up the Current Screen or Session, Without Any UI
-
-ScreenOverlayKit has no bottom-sheet UI to open — every one of these is a plain call you can make from anywhere in your code, at any time, to grab context for a Firebase event:
+ScreenOverlayKit has no bottom-sheet UI to open — every one of these is a plain call you can make from anywhere in your code, at any time:
 
 ```swift
 // The most recently tracked screen name (UIKit or SwiftUI) — nil until enable() has recorded one.
@@ -291,13 +235,6 @@ ScreenOverlay.currentSessionPaths
 ScreenOverlay.previousSessionPaths
 ```
 
-```swift
-Analytics.logEvent("checkout_started", parameters: [
-    AnalyticsParameterScreenName: ScreenOverlay.currentScreenName ?? "Unknown",
-    "hierarchy_path": ScreenOverlay.currentHierarchyPath()
-])
-```
-
 From Objective-C:
 
 ```objc
@@ -307,91 +244,6 @@ NSArray<NSString *> *currentSessionPaths = [ScreenOverlay currentSessionPaths];
 ```
 
 `currentScreenName` reflects whatever the session last recorded, so it also picks up screens tracked manually via `.screenOverlayTrack(_:)` in SwiftUI. `currentHierarchyPath()` walks the live `UIViewController` hierarchy the same way `printHierarchy` does, so — like the rest of ScreenOverlayKit's automatic detection — it only sees UIKit containers, not SwiftUI-internal navigation. Session paths recorded from `.screenOverlayTrack(_:)` work around this by appending the SwiftUI screen name to the live UIKit path at the moment it appeared.
-
-## Capture Protection
-
-`ScreenCaptureGuard` is a **separate, production-ready** feature — unlike `ScreenOverlay`, it's not a debug tool and isn't meant to be wrapped in `#if DEBUG`. It detects screenshots, screen recording/mirroring, and app backgrounding, and automatically blurs any screen you've explicitly marked as sensitive.
-
-> **Why per-screen, not the whole app?** Blurring every screen on every backgrounding is jarring and usually unnecessary. Mark only the screens that actually show sensitive data — a payment form, an ID card, a balance — the same way banking and health apps do it.
-
-### Start Monitoring
-
-Call this once, unconditionally, at launch:
-
-```swift
-import ScreenOverlayKit
-
-// AppDelegate / SceneDelegate / SwiftUI App.init() — no #if DEBUG.
-ScreenCaptureGuard.shared.startMonitoring()
-```
-
-From Objective-C:
-
-```objc
-[[ScreenCaptureGuard shared] startMonitoring];
-```
-
-### Mark a Screen as Sensitive
-
-**UIKit:**
-
-```swift
-final class PaymentViewController: UIViewController {
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        markScreenAsSensitiveOverlay()
-    }
-}
-```
-
-**SwiftUI:**
-
-```swift
-struct CardNumberView: View {
-    var body: some View {
-        Text("4242 4242 4242 4242")
-            .sensitiveScreenOverlay()
-    }
-}
-```
-
-**Objective-C:**
-
-```objc
-- (void)viewDidLoad {
-    [super viewDidLoad];
-    [self markScreenAsSensitiveOverlay];
-}
-```
-
-### What Triggers the Blur
-
-| Trigger | Behavior |
-|---|---|
-| App resigns active / App Switcher | Blurs instantly, before the system takes the snapshot — the only trigger that's fully preventable |
-| Screen recording / mirroring (`UIScreen.isCaptured`) | Blurs for the entire duration the screen is being recorded or mirrored (AirPlay, external displays) |
-| Screenshot taken | Briefly flashes the blur. iOS has no API to block or intercept a screenshot before it's saved — this only reacts after the fact |
-
-### Reacting to Events (optional)
-
-For anything beyond automatic blurring — an in-app warning, custom analytics, disabling a feature — adopt `ScreenCaptureGuardDelegate`:
-
-```swift
-final class SecurityHandler: NSObject, ScreenCaptureGuardDelegate {
-    func screenCaptureGuardDidDetectScreenshot() {
-        print("User took a screenshot")
-    }
-
-    func screenCaptureGuard(didChangeCaptureState isCaptured: Bool) {
-        print(isCaptured ? "Recording/mirroring started" : "Recording/mirroring stopped")
-    }
-}
-
-let securityHandler = SecurityHandler() // keep a strong reference — delegate is held weakly
-ScreenCaptureGuard.shared.delegate = securityHandler
-```
-
-Both events are also automatically forwarded to `ScreenOverlay.eventLogger` (see [Analytics and Firebase Logging](#analytics-and-firebase-logging) above) as `"screenshot_taken"`, `"screen_recording_started"`, and `"screen_recording_ended"` — no extra wiring needed to get these into Firebase.
 
 ## Draggable Overlay
 
@@ -460,22 +312,15 @@ Make sure `UIUserInterfaceStyle` is not forced in your Info.plist, otherwise the
 
 | Component | Responsibility |
 |---|---|
-| `ScreenOverlay` | Public entry point for the debug overlay (`enable()` / `disable()` / `logEvent(name:parameters:)` / `eventLogger` / session lookups) |
-| `ScreenOverlayEventLogger` | Protocol you implement to forward screen views & custom events to Firebase or any analytics backend |
+| `ScreenOverlay` | Public entry point (`enable()` / `disable()` / session lookups) |
 | `UIViewController+Swizzling` | Hooks into `viewDidAppear` & `viewDidDisappear` via Objective-C runtime swizzling |
 | `View+ScreenOverlayTracking` | SwiftUI `.screenOverlayTrack(_:)` view modifier for screens with no backing `UIViewController` |
 | `ViewControllerTracker` | Resolves the topmost visible VC from the window hierarchy; builds the hierarchy breadcrumb |
-| `SessionRecorder` | Records the current/previous session's full screen paths and notifies `ScreenOverlay.eventLogger` |
+| `SessionRecorder` | Records the current/previous session's full screen paths |
 | `SessionPathEntry` | One recorded screen visit: its full breadcrumb path, timestamp, and optional duration |
 | `OverlayManager` | Creates the `PassthroughWindow` above system alerts and drives the pill label's position/drag/tap behavior |
 | `OverlayLabel` | The pill label itself — owns its light/dark-mode styling and padded-text layout |
 | `PassthroughWindow` | Overrides `hitTest` so touches fall through to the app beneath, except on the pill itself |
-| `ScreenCaptureGuard` | Public entry point for capture protection (`startMonitoring()` / `stopMonitoring()` / `delegate` / `isBlurring`) — production-ready, independent of `ScreenOverlay` |
-| `ScreenCaptureGuardDelegate` | Optional protocol notified of screenshot / recording / mirroring events |
-| `SensitiveScreenRegistry` | Tracks every UIKit view marked sensitive and shows/hides its `BlurOverlayView` on command |
-| `BlurOverlayView` | The `UIVisualEffectView` blur placed over a sensitive UIKit view |
-| `UIViewController+SensitiveScreen` | `markScreenAsSensitiveOverlay()` / `unmarkScreenAsSensitiveOverlay()` for UIKit |
-| `View+SensitiveScreenOverlay` | SwiftUI `.sensitiveScreenOverlay()` modifier, driven by `ScreenCaptureGuard`'s published `isBlurring` state |
 
 ### Folder Structure
 
@@ -483,8 +328,7 @@ Make sure `UIUserInterfaceStyle` is not forced in your Info.plist, otherwise the
 Sources/ScreenOverlayKit
 │
 ├── Public
-│   ├── ScreenOverlay.swift              — enable()/disable()/logEvent()/eventLogger/session lookups
-│   └── ScreenOverlayEventLogger.swift   — analytics-forwarding protocol
+│   └── ScreenOverlay.swift              — enable()/disable()/session lookups
 │
 ├── Overlay
 │   ├── OverlayManager.swift             — window lifecycle, dragging, positioning, tap handling
@@ -497,14 +341,6 @@ Sources/ScreenOverlayKit
 ├── Session
 │   ├── SessionPathEntry.swift           — one recorded screen visit (full path, timestamp, duration)
 │   └── SessionRecorder.swift            — records/persists the current & previous session's paths
-│
-├── Security
-│   ├── ScreenCaptureGuard.swift              — production entry point: startMonitoring()/delegate/isBlurring
-│   ├── ScreenCaptureGuardDelegate.swift      — optional screenshot/recording notification protocol
-│   ├── SensitiveScreenRegistry.swift         — tracks sensitive UIKit views, shows/hides their blur
-│   ├── BlurOverlayView.swift                 — the UIVisualEffectView blur itself
-│   ├── UIViewController+SensitiveScreen.swift — markScreenAsSensitiveOverlay() for UIKit
-│   └── View+SensitiveScreenOverlay.swift     — .sensitiveScreenOverlay() modifier for SwiftUI
 │
 ├── Swizzling
 │   └── UIViewController+Swizzling.swift — hooks viewDidAppear/viewDidDisappear
@@ -547,20 +383,6 @@ See [Tap to Print the Full Hierarchy](#tap-to-print-the-full-hierarchy) above fo
 
 ```
 ⏱️ ScreenOverlay → HomeViewController stayed 4s
-```
-
-**From `ScreenOverlay.logEvent(name:parameters:)`:**
-
-```
-🔔 ScreenOverlayKit event → checkout_button_tapped ["cart_items": 3]
-```
-
-**From `ScreenCaptureGuard`, once `startMonitoring()` is running:**
-
-```
-📸 ScreenOverlayKit: Screenshot detected
-🔴 ScreenOverlayKit: Screen recording/mirroring started
-⏹️ ScreenOverlayKit: Screen recording/mirroring stopped
 ```
 
 **If something's misconfigured:**

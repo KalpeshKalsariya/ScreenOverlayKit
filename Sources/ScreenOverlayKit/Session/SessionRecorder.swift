@@ -143,8 +143,7 @@ final class SessionRecorder {
 
     // MARK: - Private Helpers
 
-    /// Appends a new session entry if `token` differs from the currently tracked screen, and
-    /// notifies `ScreenOverlay.eventLogger` of the screen view.
+    /// Appends a new session entry if `token` differs from the currently tracked screen.
     ///
     /// - Parameters:
     ///   - path: The new screen's full breadcrumb path.
@@ -154,14 +153,11 @@ final class SessionRecorder {
     private func recordAppearance(path: String, token: AnyObject) -> Bool {
         guard currentScreenToken !== token else { return false }
 
-        let previousScreenName = currentScreenName
         currentScreenToken = token
         currentSessionPaths.append(SessionPathEntry(path: path, timestamp: Date(), duration: nil))
         entryIndexByToken[ObjectIdentifier(token)] = currentSessionPaths.count - 1
         saveCurrentSession()
 
-        let newScreenName = path.components(separatedBy: " → ").last ?? path
-        ScreenOverlay.notifyScreenView(newScreenName, previousScreenName: previousScreenName)
         return true
     }
 

@@ -21,47 +21,6 @@ public final class ScreenOverlay: NSObject {
     /// Prevents external instantiation — `ScreenOverlay` is used purely as a static namespace.
     private override init() {}
 
-    // MARK: - Event Logging
-
-    /// The object that receives ScreenOverlayKit's screen-view and custom-event notifications.
-    ///
-    /// Assign an object conforming to `ScreenOverlayEventLogger` to forward events to Firebase
-    /// Analytics (or any other backend) — see `ScreenOverlayEventLogger` for a worked example.
-    /// ScreenOverlayKit itself has no dependency on any analytics SDK. Held weakly; the caller
-    /// owns the logger's lifetime.
-    @MainActor
-    public static weak var eventLogger: ScreenOverlayEventLogger?
-
-    /// Logs a custom event through the registered `eventLogger`.
-    ///
-    /// Use this for anything beyond automatic screen-view tracking — button taps, form
-    /// submissions, feature usage, etc. If no `eventLogger` is set, this only prints to the console.
-    ///
-    /// - Parameters:
-    ///   - name: The event's name (e.g. `"button_tapped"`).
-    ///   - parameters: Optional event parameters (e.g. `["button": "checkout"]`).
-    @objc(logEventWithName:parameters:)
-    @MainActor
-    public static func logEvent(name: String, parameters: [String: Any]? = nil) {
-        if let parameters {
-            print("🔔 ScreenOverlayKit event → \(name) \(parameters)")
-        } else {
-            print("🔔 ScreenOverlayKit event → \(name)")
-        }
-        eventLogger?.screenOverlayDidLogEvent(name, parameters: parameters)
-    }
-
-    /// Forwards a screen-view notification to `eventLogger`. Called internally whenever the
-    /// session records a new screen, from both the UIKit swizzling path and `.screenOverlayTrack(_:)`.
-    ///
-    /// - Parameters:
-    ///   - screenName: The new screen's name.
-    ///   - previousScreenName: The screen that was visible immediately before this one, if any.
-    @MainActor
-    static func notifyScreenView(_ screenName: String, previousScreenName: String?) {
-        eventLogger?.screenOverlayDidLogScreenView(screenName, previousScreenName: previousScreenName)
-    }
-
     // MARK: - Current Screen & Session Lookup
 
     /// The name of the current top-most tracked screen, without presenting any UI.
