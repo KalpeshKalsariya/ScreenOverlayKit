@@ -116,6 +116,20 @@ final class ViewControllerTracker {
         topViewController()
     }
 
+    /// Builds a single-line breadcrumb of the currently visible hierarchy — e.g.
+    /// `"AppRootViewController → UITabBarController → UINavigationController → ProfileViewController"` —
+    /// without printing anything to the console or presenting any UI. Use this to tag
+    /// analytics events (Firebase or otherwise) with the current screen context on demand,
+    /// instead of relying on the user tapping the overlay to open `TrailBottomSheet`.
+    ///
+    /// - Returns: The breadcrumb string, or a placeholder if no root view controller could be resolved.
+    func currentHierarchyPath() -> String {
+        guard let rootVC = rootViewController() else {
+            return "No Root View Controller Found"
+        }
+        return hierarchyPathComponents(from: rootVC).joined(separator: " → ")
+    }
+
     /// Resolves a friendly screen name for a view controller.
     ///
     /// SwiftUI screens hosted via `UIHostingController<ContentView>` are stripped down to just
@@ -174,6 +188,25 @@ final class ViewControllerTracker {
             print("\(indent)   Presented:")
             printViewController(presented, indent: indent + "   ")
         }
+    }
+
+    /// Recursively builds the breadcrumb components for `currentHierarchyPath()` by descending
+    /// through tab selection, navigation stack, and presentation, one name per container.
+    ///
+    /// - Parameter viewController: The view controller to start from.
+    /// - Returns: The breadcrumb names, root-first.
+    private func hierarchyPathComponents(from viewController: UIViewController) -> [String] {
+        var components = [Self.screenName(for: viewController)]
+
+        if let tabBar = viewController as? UITabBarController, let selected = tabBar.selectedViewController {
+            components += hierarchyPathComponents(from: selected)
+        } else if let navigation = viewController as? UINavigationController, let visible = navigation.visibleViewController {
+            components += hierarchyPathComponents(from: visible)
+        } else if let presented = viewController.presentedViewController {
+            components += hierarchyPathComponents(from: presented)
+        }
+
+        return components
     }
 
     /// Resolves the app's current root view controller from its key (or

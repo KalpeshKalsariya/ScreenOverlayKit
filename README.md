@@ -215,6 +215,35 @@ From Objective-C:
 
 Because `eventLogger` is a plain protocol rather than a hard dependency, the exact same pattern works for Mixpanel, Amplitude, or an in-house logging pipeline — just implement the two methods and point them wherever you want.
 
+### Looking Up the Current Screen Without Opening the Trail Sheet
+
+Tapping the overlay label opens `TrailBottomSheet`, which is meant for a human to read on-device — not something you want to trigger just to grab the current screen name for a Firebase event. Use these instead, from anywhere in your code:
+
+```swift
+// The most recently tracked screen name (UIKit or SwiftUI) — nil until enable() has recorded one.
+ScreenOverlay.currentScreenName
+
+// A single-line breadcrumb of the live UIKit hierarchy, e.g.
+// "AppRootViewController → UITabBarController → ProfileViewController"
+ScreenOverlay.currentHierarchyPath()
+```
+
+```swift
+Analytics.logEvent("checkout_started", parameters: [
+    AnalyticsParameterScreenName: ScreenOverlay.currentScreenName ?? "Unknown",
+    "hierarchy_path": ScreenOverlay.currentHierarchyPath()
+])
+```
+
+From Objective-C:
+
+```objc
+NSString *screenName = [ScreenOverlay currentScreenName];
+NSString *hierarchyPath = [ScreenOverlay currentHierarchyPath];
+```
+
+`currentScreenName` reflects whatever the trail last recorded, so it also picks up screens tracked manually via `.screenOverlayTrack(_:)` in SwiftUI. `currentHierarchyPath()` walks the live `UIViewController` hierarchy the same way `printHierarchy` does, so — like the rest of ScreenOverlayKit's automatic detection — it only sees UIKit containers, not SwiftUI-internal navigation.
+
 ## Draggable Overlay
 
 By default the overlay is fixed at the top center, respecting the safe area. Pass `draggable: true` to let you drag it anywhere on screen. It snaps to the nearest edge when released.

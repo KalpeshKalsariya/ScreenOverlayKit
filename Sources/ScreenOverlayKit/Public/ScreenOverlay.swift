@@ -62,6 +62,35 @@ public final class ScreenOverlay: NSObject {
         eventLogger?.screenOverlayDidLogScreenView(screenName, previousScreenName: previousScreenName)
     }
 
+    // MARK: - Current Screen Lookup
+
+    /// The name of the current top-most tracked screen, without presenting any UI.
+    ///
+    /// Reflects whichever screen was most recently recorded — whether from automatic UIKit
+    /// tracking or `.screenOverlayTrack(_:)` in SwiftUI. Use this to tag a Firebase (or any
+    /// other) event with the active screen, instead of tapping the overlay to open the trail sheet.
+    ///
+    /// - Note: Returns `nil` until `enable()` has recorded at least one screen.
+    @MainActor
+    public static var currentScreenName: String? {
+        TrailLogger.shared.currentScreenName
+    }
+
+    /// A single-line breadcrumb of the current view controller hierarchy — e.g.
+    /// `"AppRootViewController → UITabBarController → ProfileViewController"` — without
+    /// presenting any UI or printing to the console.
+    ///
+    /// This walks the live UIKit hierarchy, so (like `printHierarchy`) it only reflects
+    /// `UIViewController` containers — it won't see navigation that happens purely inside
+    /// SwiftUI. For a name that also covers `.screenOverlayTrack(_:)` screens, use `currentScreenName`.
+    ///
+    /// - Returns: The breadcrumb string.
+    @objc(currentHierarchyPath)
+    @MainActor
+    public static func currentHierarchyPath() -> String {
+        ViewControllerTracker.shared.currentHierarchyPath()
+    }
+
     // MARK: - Public API
 
     /// Enables the ScreenOverlay overlay.
