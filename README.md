@@ -405,12 +405,31 @@ ScreenOverlay.enable(draggable: true)
 
 ## Tap to Print the Full Hierarchy
 
-Tap the overlay label to print the complete hierarchy for whatever's currently visible — navigation stack, tab selection, and modal presentation chain — to the Xcode console:
+Tap the overlay label to print the complete hierarchy for whatever's currently visible — navigation stack, tab selection, and modal presentation chain — to the Xcode console.
+
+For a simple app — just a `UINavigationController` with one screen — it looks like this:
 
 ```
 ==========================
 📡 ScreenOverlayKit Hierarchy
 ==========================
+
+↳ UINavigationController
+   Navigation Stack:
+   • ViewController
+   Visible:
+   ↳ ViewController
+
+==========================
+```
+
+For a deeper hierarchy — a tab bar, a nested navigation stack, and a presented modal — every level is printed the same way, just nested further:
+
+```
+==========================
+📡 ScreenOverlayKit Hierarchy
+==========================
+
 ↳ AppRootViewController
    Selected Tab:
    ↳ UITabBarController
@@ -421,6 +440,7 @@ Tap the overlay label to print the complete hierarchy for whatever's currently v
       ↳ ProfileViewController
          Presented:
          ↳ EditProfileViewController
+
 ==========================
 ```
 
@@ -495,34 +515,65 @@ Sources/ScreenOverlayKit
 
 ## Console Output
 
-When active, ScreenOverlayKit prints to the Xcode console:
+Every line ScreenOverlayKit can print, grouped by when it happens — this is the complete list, not a trimmed sample.
+
+**On `enable()` / `disable()`:**
 
 ```
 🚀 ScreenOverlayKit enabled
+🛑 ScreenOverlayKit disabled
+```
+
+**On every screen change (automatic — no setup beyond `enable()`):**
+
+```
 📱 ScreenOverlay → HomeViewController
 📱 ScreenOverlay → ProfileViewController
+```
 
-// With trackScreenDuration: true, printed as the user navigates away from a screen:
+**With `trackScreenDuration: true`, printed the moment the user navigates away from a screen:**
+
+```
 ⏱️ ScreenOverlay → HomeViewController stayed 4s
+```
 
-// After tapping the label — see "Tap to Print the Full Hierarchy" above:
+**After tapping the overlay label** — see [Tap to Print the Full Hierarchy](#tap-to-print-the-full-hierarchy) above for the full breakdown:
+
+```
 ==========================
 📡 ScreenOverlayKit Hierarchy
 ==========================
-↳ AppRootViewController
-   ...
+
+↳ UINavigationController
+   Navigation Stack:
+   • ViewController
+   Visible:
+   ↳ ViewController
+
 ==========================
+```
 
-// From ScreenOverlay.logEvent(name:parameters:):
+**From `ScreenOverlay.logEvent(name:parameters:)`:**
+
+```
 🔔 ScreenOverlayKit event → checkout_button_tapped ["cart_items": 3]
+```
 
-// From ScreenCaptureGuard, once startMonitoring() is running:
+**From `ScreenCaptureGuard`, once `startMonitoring()` is running:**
+
+```
 📸 ScreenOverlayKit: Screenshot detected
 🔴 ScreenOverlayKit: Screen recording/mirroring started
 ⏹️ ScreenOverlayKit: Screen recording/mirroring stopped
-
-🛑 ScreenOverlayKit disabled
 ```
+
+**If something's misconfigured:**
+
+```
+❌ ScreenOverlayKit: No UIWindowScene found
+```
+
+This means `ScreenOverlay.enable()` ran before any `UIWindowScene` was connected — most commonly, calling it from a SwiftUI `App.init()` instead of `.onAppear` (see the [SwiftUI](#swiftui) section above), or too early in a custom `AppDelegate`/`SceneDelegate` flow. The overlay silently fails to appear when this happens; move the `enable()` call later in the launch sequence.
 
 ## Disabling
 
