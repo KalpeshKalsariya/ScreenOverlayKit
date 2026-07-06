@@ -162,7 +162,8 @@ final class SessionRecorder {
     }
 
     /// Stamps the duration of the screen `token` belongs to, and prints how long it stayed on
-    /// top — whether the user navigated forward, back, or dismissed it.
+    /// top — whether the user navigated forward, back, or dismissed it — along with whatever
+    /// screen replaced it.
     ///
     /// - Parameter token: The identity object of the screen that disappeared.
     private func recordDisappearance(token: AnyObject) {
@@ -175,8 +176,12 @@ final class SessionRecorder {
         currentSessionPaths[index].duration = duration
         saveCurrentSession()
 
+        // By the time a screen's disappearance is recorded, whatever replaced it has already
+        // appeared (UIKit always fires the new screen's viewDidAppear before the old screen's
+        // viewDidDisappear), so currentScreenName already reflects the destination.
         let screenName = entry.path.components(separatedBy: " → ").last ?? entry.path
-        print("⏱️ ScreenOverlay → \(screenName) stayed \(Self.format(duration: duration))")
+        let destination = currentScreenName.map { " -> \($0)" } ?? ""
+        print("⏱️ ScreenOverlay → \(screenName) stayed \(Self.format(duration: duration))\(destination)")
     }
 
     /// Formats a duration as a short human-readable string (e.g. `"<1s"`, `"12s"`, `"2m 5s"`).

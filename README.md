@@ -379,10 +379,10 @@ Every line ScreenOverlayKit can print, grouped by when it happens — this is th
 
 See [Tap to Print the Full Hierarchy](#tap-to-print-the-full-hierarchy) above for what this looks like with a tab bar, nested navigation, and a presented modal.
 
-**With `trackScreenDuration: true`, printed the moment the user navigates away from a screen:**
+**With `trackScreenDuration: true`, printed the moment the user navigates away from a screen** — including where they went:
 
 ```
-⏱️ ScreenOverlay → HomeViewController stayed 4s
+⏱️ ScreenOverlay → HomeViewController stayed 4s -> ProfileViewController
 ```
 
 **If something's misconfigured:**
