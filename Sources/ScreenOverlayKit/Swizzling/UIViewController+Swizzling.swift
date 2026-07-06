@@ -68,12 +68,15 @@ extension UIViewController {
     /// Replacement for `viewDidDisappear(_:)` that calls through to the original
     /// implementation, then notifies ScreenOverlayKit that this screen disappeared.
     ///
+    /// - Note: Deliberately does *not* call `ViewControllerTracker.refresh()` — whatever screen
+    ///   replaces this one will already have triggered its own refresh via its `viewDidAppear`.
+    ///   Calling it here too just re-prints/re-renders the same (already current) screen name.
+    ///
     /// - Parameter animated: Whether the disappearance was animated, forwarded to the original implementation.
     @objc private func overlayKit_viewDidDisappear(_ animated: Bool) {
         overlayKit_viewDidDisappear(animated) // calls original implementation
         DispatchQueue.main.async {
             ViewControllerTracker.shared.recordDisappear(for: self)
-            ViewControllerTracker.shared.refresh()
         }
     }
 }
