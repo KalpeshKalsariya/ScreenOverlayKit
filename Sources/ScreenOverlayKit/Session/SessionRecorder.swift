@@ -58,8 +58,8 @@ final class SessionRecorder {
     /// and clearing `currentSessionPaths`. Safe to call more than once — only the first call
     /// in a session has an effect.
     ///
-    /// - Parameter trackScreenDuration: Whether subsequent entries should record how long each
-    ///   screen stayed on top.
+    /// - Parameter trackScreenDuration: Whether subsequent entries should record (and print to
+    ///   the console) how long each screen stayed on top.
     func startSession(trackScreenDuration: Bool) {
         self.trackScreenDuration = trackScreenDuration
         guard !didStartSession else { return }
@@ -154,7 +154,8 @@ final class SessionRecorder {
         return true
     }
 
-    /// Stamps the duration of the currently tracked screen if `token` matches it.
+    /// Stamps the duration of the currently tracked screen if `token` matches it, and prints
+    /// how long it stayed on top — whether the user navigated forward, back, or dismissed it.
     ///
     /// - Parameter token: The identity object of the screen that disappeared.
     private func recordDisappearance(token: AnyObject) {
@@ -162,8 +163,30 @@ final class SessionRecorder {
         guard currentScreenToken === token else { return }
         guard let lastIndex = currentSessionPaths.indices.last else { return }
 
-        currentSessionPaths[lastIndex].duration = Date().timeIntervalSince(currentSessionPaths[lastIndex].timestamp)
+        let entry = currentSessionPaths[lastIndex]
+        let duration = Date().timeIntervalSince(entry.timestamp)
+        currentSessionPaths[lastIndex].duration = duration
         saveCurrentSession()
+
+        let screenName = entry.path.components(separatedBy: " → ").last ?? entry.path
+        print("⏱️ ScreenOverlay → \(screenName) stayed \(Self.format(duration: duration))")
+    }
+
+    /// Formats a duration as a short human-readable string (e.g. `"<1s"`, `"12s"`, `"2m 5s"`).
+    ///
+    /// - Parameter duration: The duration, in seconds.
+    /// - Returns: The formatted duration string.
+    private static func format(duration: TimeInterval) -> String {
+        guard duration >= 1 else { return "<1s" }
+
+        let seconds = Int(duration.rounded())
+        if seconds < 60 {
+            return "\(seconds)s"
+        }
+
+        let minutes = seconds / 60
+        let remainder = seconds % 60
+        return "\(minutes)m \(remainder)s"
     }
 
     /// Persists `currentSessionPaths` to `UserDefaults`.

@@ -115,8 +115,9 @@ public final class ScreenOverlay: NSObject {
     /// - Parameters:
     ///   - draggable: When `true`, the overlay label can be dragged anywhere on screen
     ///     and snaps to the nearest edge on release. Defaults to `false`.
-    ///   - trackScreenDuration: When `true`, session entries also record how long the app
-    ///     spent on each screen. Defaults to `false`.
+    ///   - trackScreenDuration: When `true`, session entries also record (and print to the
+    ///     console) how long the app spent on each screen, whenever the user navigates away
+    ///     from it. Defaults to `false`.
     ///
     /// - Note: Call this once, ideally in `AppDelegate.application(_:didFinishLaunchingWithOptions:)`,
     ///   `SceneDelegate.scene(_:willConnectTo:options:)`, or a SwiftUI view's `.onAppear`.
