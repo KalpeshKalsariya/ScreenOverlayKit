@@ -85,7 +85,7 @@ targets: [
 | Parameter | Default | Description |
 |---|---|---|
 | `draggable` | `false` | Lets you drag the overlay anywhere on screen; snaps to the nearest edge on release |
-| `trackScreenDuration` | `false` | Records how long each screen stayed on top, stored alongside its session path (see `currentSessionPaths`) |
+| `trackScreenDuration` | `false` | Records how long each screen stayed on top — printed to the console as the user navigates away, and stored alongside its session path (see `currentSessionPaths`) |
 
 ScreenOverlayKit works from **Swift (UIKit)**, **SwiftUI**, and **Objective-C** — pick the section below that matches your project.
 
@@ -453,6 +453,9 @@ When active, ScreenOverlayKit prints to the Xcode console:
 🚀 ScreenOverlayKit enabled
 📱 ScreenOverlay → HomeViewController
 📱 ScreenOverlay → ProfileViewController
+
+// With trackScreenDuration: true, printed as the user navigates away from a screen:
+⏱️ ScreenOverlay → HomeViewController stayed 4s
 
 // After tapping the label — see "Tap to Print the Full Hierarchy" above:
 ==========================
