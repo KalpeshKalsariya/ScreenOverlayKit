@@ -2,7 +2,7 @@
 
 # ScreenOverlayKit
 
-A lightweight debug tool for iOS developers to instantly see which screen they're on while testing their app.
+A lightweight debug tool for iOS developers to instantly see which screen they're on while testing their app — plus a separate, production-ready guard against screenshots, screen recording, and shoulder-surfing.
 
 </div>
 
@@ -15,9 +15,26 @@ https://github.com/user-attachments/assets/94611da2-581f-4ceb-96f1-ed5e4431c991
 </div>
 
 
-The overlay label updates automatically as the user moves from screen to screen — no manual calls needed. Tapping the label prints the full view-controller hierarchy (nav stack → tab → modal chain) for the current screen to the console, and the label itself can be dragged to any edge of the screen.
+The overlay label updates automatically as you move from screen to screen — no manual calls needed. Tapping the label prints the full view-controller hierarchy (nav stack → tab → modal chain) to the console, and the label can be dragged to any edge of the screen.
 
-ScreenOverlayKit also ships a separate, production-safe `ScreenCaptureGuard` that detects screenshots, screen recording/mirroring, and app backgrounding, and automatically blurs any screen you mark as sensitive.
+ScreenOverlayKit also ships `ScreenCaptureGuard`, a separate, production-safe feature that detects screenshots, screen recording/mirroring, and app backgrounding, and automatically blurs any screen you mark as sensitive.
+
+## Table of Contents
+
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation (Swift Package Manager)](#installation-swift-package-manager)
+- [Quick Start](#quick-start)
+- [Usage](#usage)
+- [Analytics and Firebase Logging](#analytics-and-firebase-logging)
+- [Capture Protection](#capture-protection)
+- [Draggable Overlay](#draggable-overlay)
+- [Tap to Print the Full Hierarchy](#tap-to-print-the-full-hierarchy)
+- [Dark & Light Mode](#dark--light-mode)
+- [How It Works](#how-it-works)
+- [Console Output](#console-output)
+- [Disabling](#disabling)
+- [License](#license)
 
 ## Features
 
@@ -25,7 +42,7 @@ ScreenOverlayKit also ships a separate, production-safe `ScreenCaptureGuard` tha
 - 📱 **Real-time screen name overlay** — floating pill label shows the active screen's name
 - 🔄 **Auto-detection (UIKit)** — uses method swizzling on `viewDidAppear` / `viewDidDisappear`, no manual calls needed
 - 🧩 **SwiftUI support** — a `.screenOverlayTrack("ScreenName")` view modifier tracks screens that live entirely inside SwiftUI navigation
-- 👆 **Tap to print the hierarchy** — tap the label to print the complete hierarchy (nav stack, tab bar, modal chain) for the current screen to the console
+- 👆 **Tap to print the hierarchy** — tap the label to print the complete hierarchy (nav stack, tab bar, modal chain) to the console
 - 🧵 **Session history with full paths** — every screen visited during the current (and previous) session is recorded as a full breadcrumb path, queryable any time — no UI needed
 - 📊 **Analytics hook** — implement `ScreenOverlayEventLogger` to forward every screen view (and any custom event you log) to Firebase Analytics or any other backend
 - 🫥 **Passthrough touches** — the overlay never blocks your app's own interactions; only the pill itself is interactive
@@ -50,19 +67,20 @@ ScreenOverlayKit also ships a separate, production-safe `ScreenCaptureGuard` tha
 | Swift tools version | 6.3 (Swift 6 language mode) |
 | Xcode | Toolchain with Swift 6.3 support |
 
-## Installation
+## Installation (Swift Package Manager)
 
-### Swift Package Manager (Recommended)
+**Option A — Xcode (recommended):**
 
 1. In Xcode, go to **File → Add Package Dependencies…**
-2. Enter the repository URL:
+2. Paste the repository URL:
    ```
    https://github.com/KalpeshKalsariya/ScreenOverlayKit
    ```
-3. Select **Up to Next Major Version** starting from `1.0.0`
-4. Add to your app target (not a framework target)
+3. For the version rule, choose **Up to Next Major Version**, starting from `1.0.0`
+4. Add `ScreenOverlayKit` to your **app target** (not a framework/watch/extension target)
+5. Click **Add Package** — Xcode fetches and links it automatically
 
-Or add it manually to your `Package.swift`:
+**Option B — edit `Package.swift` by hand:**
 
 ```swift
 dependencies: [
@@ -75,6 +93,36 @@ targets: [
     )
 ]
 ```
+
+Then run `swift package resolve` (or just build — Xcode/SPM resolves it automatically).
+
+That's the whole install — no CocoaPods, no Carthage, no extra build phases, no `GoogleService-Info.plist`-style setup files. Once it's added, `import ScreenOverlayKit` works in any file in your app target.
+
+## Quick Start
+
+The fastest way to see it working, in a UIKit app:
+
+```swift
+import ScreenOverlayKit
+
+@main
+class AppDelegate: UIResponder, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+    ) -> Bool {
+        #if DEBUG
+        ScreenOverlay.enable()
+        #endif
+        return true
+    }
+}
+```
+
+Build and run. You'll see a small pill label appear at the top of the screen showing the name of whatever screen is currently visible — it updates automatically as you navigate, no further code needed.
+
+- Building a **SwiftUI** app, need **Objective-C**, or want the draggable/session/analytics options? See [Usage](#usage) below for the full walkthrough of each.
+- Want to protect sensitive screens from screenshots and screen recording (works in production, not just debug builds)? See [Capture Protection](#capture-protection).
 
 ## Usage
 
@@ -181,7 +229,7 @@ If your app uses `UIApplicationDelegateAdaptor`, you can instead call `ScreenOve
 [ScreenOverlay disable];
 ```
 
-## Analytics / Event Logging (Firebase, etc.)
+## Analytics and Firebase Logging
 
 ScreenOverlayKit has **no dependency on Firebase or any analytics SDK**. Instead, it exposes a small `ScreenOverlayEventLogger` protocol — implement it and assign it to `ScreenOverlay.eventLogger` to forward every screen view (and any custom event you log) to whatever backend you use.
 
@@ -260,7 +308,7 @@ NSArray<NSString *> *currentSessionPaths = [ScreenOverlay currentSessionPaths];
 
 `currentScreenName` reflects whatever the session last recorded, so it also picks up screens tracked manually via `.screenOverlayTrack(_:)` in SwiftUI. `currentHierarchyPath()` walks the live `UIViewController` hierarchy the same way `printHierarchy` does, so — like the rest of ScreenOverlayKit's automatic detection — it only sees UIKit containers, not SwiftUI-internal navigation. Session paths recorded from `.screenOverlayTrack(_:)` work around this by appending the SwiftUI screen name to the live UIKit path at the moment it appeared.
 
-## Screenshot, Recording & Capture Protection
+## Capture Protection
 
 `ScreenCaptureGuard` is a **separate, production-ready** feature — unlike `ScreenOverlay`, it's not a debug tool and isn't meant to be wrapped in `#if DEBUG`. It detects screenshots, screen recording/mirroring, and app backgrounding, and automatically blurs any screen you've explicitly marked as sensitive.
 
@@ -343,7 +391,7 @@ let securityHandler = SecurityHandler() // keep a strong reference — delegate 
 ScreenCaptureGuard.shared.delegate = securityHandler
 ```
 
-Both events are also automatically forwarded to `ScreenOverlay.eventLogger` (see [Analytics / Event Logging](#analytics--event-logging-firebase-etc) above) as `"screenshot_taken"`, `"screen_recording_started"`, and `"screen_recording_ended"` — no extra wiring needed to get these into Firebase.
+Both events are also automatically forwarded to `ScreenOverlay.eventLogger` (see [Analytics and Firebase Logging](#analytics-and-firebase-logging) above) as `"screenshot_taken"`, `"screen_recording_started"`, and `"screen_recording_ended"` — no extra wiring needed to get these into Firebase.
 
 ## Draggable Overlay
 
