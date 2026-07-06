@@ -68,15 +68,20 @@ extension UIViewController {
     /// Replacement for `viewDidDisappear(_:)` that calls through to the original
     /// implementation, then notifies ScreenOverlayKit that this screen disappeared.
     ///
-    /// - Note: Deliberately does *not* call `ViewControllerTracker.refresh()` — whatever screen
-    ///   replaces this one will already have triggered its own refresh via its `viewDidAppear`.
-    ///   Calling it here too just re-prints/re-renders the same (already current) screen name.
+    /// - Note: `refresh()` is called here too, not just from `viewDidAppear` — for most
+    ///   transitions (push/pop, full-screen present/dismiss) the newly-appeared screen already
+    ///   refreshed the label, and `refresh()`'s own `lastReportedScreenName` check makes this a
+    ///   safe no-op. But non-covering presentations like `UIAlertController` never call
+    ///   `viewDidAppear`/`viewDidDisappear` on the screen underneath them (it's considered to
+    ///   have never disappeared), so dismissing an alert only fires *this* disappear — without
+    ///   it, the label would stay stuck on "UIAlertController" forever.
     ///
     /// - Parameter animated: Whether the disappearance was animated, forwarded to the original implementation.
     @objc private func overlayKit_viewDidDisappear(_ animated: Bool) {
         overlayKit_viewDidDisappear(animated) // calls original implementation
         DispatchQueue.main.async {
             ViewControllerTracker.shared.recordDisappear(for: self)
+            ViewControllerTracker.shared.refresh()
         }
     }
 }
