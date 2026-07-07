@@ -52,8 +52,8 @@ The overlay label updates automatically as you move from screen to screen — no
 | Minimum | |
 |---|---|
 | iOS | 13.0+ |
-| Swift tools version | 6.3 (Swift 6 language mode) |
-| Xcode | Toolchain with Swift 6.3 support |
+| Swift tools version | 5.9 |
+| Xcode | 15.0+ |
 
 ## Installation (Swift Package Manager)
 
@@ -85,6 +85,8 @@ targets: [
 Then run `swift package resolve` (or just build — Xcode/SPM resolves it automatically).
 
 That's the whole install — no CocoaPods, no Carthage, no extra build phases, no `GoogleService-Info.plist`-style setup files. Once it's added, `import ScreenOverlayKit` works in any file in your app target.
+
+ScreenOverlayKit targets Swift tools version 5.9 (Xcode 15.0+), so it doesn't require the latest Xcode release to add or build.
 
 ## Quick Start
 
