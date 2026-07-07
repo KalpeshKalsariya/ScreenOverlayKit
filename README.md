@@ -216,6 +216,22 @@ If your app uses `UIApplicationDelegateAdaptor`, you can instead call `ScreenOve
 [ScreenOverlay disable];
 ```
 
+### Custom Tab Bars & Containers
+
+ScreenOverlayKit's automatic detection can see through `UINavigationController` (`visibleViewController`) and `UITabBarController` (`selectedViewController`) on its own. If your app uses a **custom** tab bar or container view controller built with child view controller containment instead of `UITabBarController`, it's a dead end for that walk by default — the overlay, the tap-to-print hierarchy, and session recording would all report the container itself (e.g. `TabVC`) instead of whichever screen is actually visible inside it.
+
+Conform your container to `ScreenOverlayContainerViewController` to fix that:
+
+```swift
+extension TabVC: ScreenOverlayContainerViewController {
+    var screenOverlayVisibleChildViewController: UIViewController? {
+        arrayNavigationVC.indices.contains(selectedIndex) ? arrayNavigationVC[selectedIndex] : nil
+    }
+}
+```
+
+That's the only change needed — once `TabVC` conforms, the label, hierarchy printout, `currentHierarchyPath()`, and session paths all resolve through it to whichever child is actually on screen.
+
 ## Looking Up the Current Screen or Session, Without Any UI
 
 ScreenOverlayKit has no bottom-sheet UI to open — every one of these is a plain call you can make from anywhere in your code, at any time:
@@ -313,6 +329,7 @@ Make sure `UIUserInterfaceStyle` is not forced in your Info.plist, otherwise the
 | Component | Responsibility |
 |---|---|
 | `ScreenOverlay` | Public entry point (`enable()` / `disable()` / session lookups) |
+| `ScreenOverlayContainerViewController` | Protocol for custom tab bars/containers to expose their visible child to the hierarchy walk |
 | `UIViewController+Swizzling` | Hooks into `viewDidAppear` & `viewDidDisappear` via Objective-C runtime swizzling |
 | `View+ScreenOverlayTracking` | SwiftUI `.screenOverlayTrack(_:)` view modifier for screens with no backing `UIViewController` |
 | `ViewControllerTracker` | Resolves the topmost visible VC from the window hierarchy; builds the hierarchy breadcrumb |
@@ -328,7 +345,8 @@ Make sure `UIUserInterfaceStyle` is not forced in your Info.plist, otherwise the
 Sources/ScreenOverlayKit
 │
 ├── Public
-│   └── ScreenOverlay.swift              — enable()/disable()/session lookups
+│   ├── ScreenOverlay.swift              — enable()/disable()/session lookups
+│   └── ScreenOverlayContainerViewController.swift — protocol for custom tab bars/containers
 │
 ├── Overlay
 │   ├── OverlayManager.swift             — window lifecycle, dragging, positioning, tap handling

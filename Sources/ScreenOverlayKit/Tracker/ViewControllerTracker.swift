@@ -203,6 +203,12 @@ final class ViewControllerTracker {
             }
         }
 
+        if let container = viewController as? ScreenOverlayContainerViewController,
+           let visibleChild = container.screenOverlayVisibleChildViewController {
+            print("\(indent)   Visible Child:")
+            printViewController(visibleChild, indent: indent + "   ")
+        }
+
         if let presented = viewController.presentedViewController {
             print("\(indent)   Presented:")
             printViewController(presented, indent: indent + "   ")
@@ -221,6 +227,9 @@ final class ViewControllerTracker {
             components += hierarchyPathComponents(from: selected)
         } else if let navigation = viewController as? UINavigationController, let visible = navigation.visibleViewController {
             components += hierarchyPathComponents(from: visible)
+        } else if let container = viewController as? ScreenOverlayContainerViewController,
+                  let visibleChild = container.screenOverlayVisibleChildViewController {
+            components += hierarchyPathComponents(from: visibleChild)
         } else if let presented = viewController.presentedViewController {
             components += hierarchyPathComponents(from: presented)
         }
@@ -274,6 +283,10 @@ final class ViewControllerTracker {
             return topViewController(from: tabBar.selectedViewController)
         }
 
+        if let container = vc as? ScreenOverlayContainerViewController, container.screenOverlayVisibleChildViewController != nil {
+            return topViewController(from: container.screenOverlayVisibleChildViewController)
+        }
+
         if let presented = vc?.presentedViewController {
             return topViewController(from: presented)
         }
@@ -302,6 +315,11 @@ final class ViewControllerTracker {
         if let tabBar = vc as? UITabBarController {
             guard let selected = tabBar.selectedViewController else { return [tabBar] }
             return visibleScreens(from: selected)
+        }
+
+        if let container = vc as? ScreenOverlayContainerViewController {
+            guard let visibleChild = container.screenOverlayVisibleChildViewController else { return [container] }
+            return visibleScreens(from: visibleChild)
         }
 
         if let presented = vc.presentedViewController {
