@@ -27,6 +27,5 @@ let package = Package(
             dependencies: ["ScreenOverlayKit"],
             path: "Tests/ScreenOverlayKitTests"
         ),
-    ],
-    swiftLanguageModes: [.v6]
+    ]
 )
